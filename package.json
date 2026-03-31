@@ -1,0 +1,18 @@
+{
+  "name": "travel-search",
+  "version": "1.0.0",
+  "description": "Agent skill for searching flights, tours, and excursions via Travelpayouts",
+  "keywords": ["agent-skill", "travel", "flights", "tours", "excursions", "aviasales", "travelata", "tripster"],
+  "author": "MissiaL",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MissiaL/travel-search.git"
+  },
+  "files": [
+    "SKILL.md",
+    "scripts/",
+    "references/",
+    "assets/"
+  ]
+}
