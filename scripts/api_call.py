@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -44,6 +45,31 @@ def _filter_headers(headers):
     return headers
 
 
+_SENSITIVE_PATTERNS = re.compile(
+    r"(token|key|secret|password|credential|marker|auth)[=:]\s*\S+",
+    re.IGNORECASE,
+)
+
+_HTTP_ERROR_MESSAGES = {
+    400: "Bad request",
+    401: "Authentication error",
+    403: "Access denied",
+    404: "Not found",
+    405: "Method not allowed",
+    429: "Rate limit exceeded",
+    500: "Internal server error",
+    502: "Bad gateway",
+    503: "Service unavailable",
+    504: "Gateway timeout",
+}
+
+
+def _sanitize_error(text):
+    text = _SENSITIVE_PATTERNS.sub(r"\1=***", text)
+    text = re.sub(r"/(?:home|opt|usr|var|etc|tmp)/\S+", "<path>", text)
+    return text
+
+
 def make_request(method, url, params=None, body=None, headers=None):
     try:
         _validate_url(url)
@@ -73,12 +99,12 @@ def make_request(method, url, params=None, body=None, headers=None):
         json.dump(result, sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")
     except urllib.error.HTTPError as e:
-        error_body = e.read().decode("utf-8", errors="replace")[:500]
+        error_body = _sanitize_error(e.read().decode("utf-8", errors="replace")[:500])
         json.dump({"error": True, "status": e.code, "message": error_body}, sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")
         sys.exit(1)
     except Exception as e:
-        json.dump({"error": True, "message": str(e)}, sys.stdout, ensure_ascii=False, indent=2)
+        json.dump({"error": True, "message": _sanitize_error(str(e))}, sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")
         sys.exit(1)
 

@@ -92,20 +92,6 @@ If strict filters return 0 results:
 
 ## Key IDs
 
-See [travelata-directories.md](travelata-directories.md) for full directory endpoints.
+Look up all IDs dynamically via directory endpoints — see [travelata-directories.md](travelata-directories.md).
 
-### Countries
-- `92` Turkey, `34` Egypt, `87` Thailand, `69` UAE
-
-### Departure Cities
-- `2` Moscow, `1` Saint Petersburg, `3` Yekaterinburg, `4` Novosibirsk, `5` Kazan
-
-### Hotel Categories
-- `7` 5*, `8` 5*(HV-1), `4` 4*, `9` 4*(HV-2), `3` 3*, `2` 2*, `1` 1*
-
-### Meals
-- `8` UAI, `1` AI, `11` AI without alcohol, `3` FB, `5` HB, `2` BB, `7` RO
-
-### Turkey Resorts
-- `2161` Antalya, `3839` Kemer, `3835` Kemer: Beldibi, `2159` Alanya
-- `2162` Belek, `3828` Side, `2178` Marmaris, `2163` Bodrum, `2190` Fethiye, `2185` Istanbul
+Departure city IDs are in [assets/departure-cities.json](../assets/departure-cities.json).
