@@ -9,7 +9,7 @@
 
 ## Демо
 
-![Travel search demo](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/book.gif)
+![Travel search demo](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/book_small.gif)
 
 <details>
 <summary>Пример ответа</summary>
