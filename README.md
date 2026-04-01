@@ -3,19 +3,20 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![agentskills.io](https://img.shields.io/badge/agentskills.io-compatible-purple.svg)](https://agentskills.io)
+[![ClawHub](https://img.shields.io/badge/ClawHub-travel--search--ru-blue.svg)](https://clawhub.ai/skills/travel-search-ru)
 
 AI agent skill for searching flights, package tours, and excursions with real prices and direct booking links.
 
 ## Demo
 
-![Travel search demo](https://github.com/MissiaL/travel-search/releases/download/v1.0/book.gif)
+![Travel search demo](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/book.gif)
 
 <details>
 <summary>Example response</summary>
 
-![Request](https://github.com/MissiaL/travel-search/releases/download/v1.0/request.webp)
-![Response part 1](https://github.com/MissiaL/travel-search/releases/download/v1.0/response1.webp)
-![Response part 2](https://github.com/MissiaL/travel-search/releases/download/v1.0/response2.webp)
+![Request](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/request.webp)
+![Response part 1](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/response1.webp)
+![Response part 2](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/response2.webp)
 
 </details>
 
@@ -52,7 +53,7 @@ User gets prices, dates, airlines, hotels, and booking links
 ## Installation
 
 ```bash
-git clone https://github.com/MissiaL/travel-search.git travel-search
+git clone https://github.com/MissiaL/travel-search-ru.git travel-search
 ```
 
 The directory name must be `travel-search` to match the skill name.
