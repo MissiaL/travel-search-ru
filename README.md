@@ -6,6 +6,19 @@
 
 AI agent skill for searching flights, package tours, and excursions with real prices and direct booking links.
 
+## Demo
+
+![Travel search demo](https://github.com/MissiaL/travel-search/releases/download/v1.0/book.gif)
+
+<details>
+<summary>Example response</summary>
+
+![Request](https://github.com/MissiaL/travel-search/releases/download/v1.0/request.webp)
+![Response part 1](https://github.com/MissiaL/travel-search/releases/download/v1.0/response1.webp)
+![Response part 2](https://github.com/MissiaL/travel-search/releases/download/v1.0/response2.webp)
+
+</details>
+
 ## Compatible agents
 
 Works with any [agentskills.io](https://agentskills.io)-compatible AI agent:
@@ -17,7 +30,7 @@ Works with any [agentskills.io](https://agentskills.io)-compatible AI agent:
 | Provider | What | Data |
 |----------|------|------|
 | **Aviasales** | Flights | Cached prices from user searches (updated daily), all airlines |
-| **Travelata** | Package tours | Real-time search: flight + hotel + transfer, all-inclusive options |
+| **Travelata** | Package tours | Real-time search: flight + hotel, all-inclusive options |
 | **Sputnik8** | Excursions & activities | Tours, tickets, transfers in 900+ cities worldwide |
 
 ## How it works

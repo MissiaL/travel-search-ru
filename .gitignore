@@ -3,3 +3,5 @@ AGENTS.md
 docs/
 .playwright-cli/
 *.png
+*.gif
+*.webp
