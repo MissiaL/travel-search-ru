@@ -53,10 +53,10 @@ User gets prices, dates, airlines, hotels, and booking links
 ## Installation
 
 ```bash
-git clone https://github.com/MissiaL/travel-search-ru.git travel-search
+git clone https://github.com/MissiaL/travel-search-ru.git travel-search-ru
 ```
 
-The directory name must be `travel-search` to match the skill name.
+The directory name must be `travel-search-ru` to match the skill name.
 
 ## Requirements
 

@@ -1,5 +1,5 @@
 ---
-name: travel-search
+name: travel-search-ru
 description: Search for flights, tours, and excursions with real prices and booking links. Use when the user asks about travel, flights, airfare, hotels, tours, excursions, vacations, or trip planning.
 metadata: {"author":"MissiaL","version":"1.0"}
 ---
