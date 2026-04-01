@@ -5,105 +5,105 @@
 [![agentskills.io](https://img.shields.io/badge/agentskills.io-compatible-purple.svg)](https://agentskills.io)
 [![ClawHub](https://img.shields.io/badge/ClawHub-travel--search--ru-blue.svg)](https://clawhub.ai/skills/travel-search-ru)
 
-AI agent skill for searching flights, package tours, and excursions with real prices and direct booking links.
+Навык для AI-агентов: поиск авиабилетов, пакетных туров и экскурсий с реальными ценами и ссылками на бронирование.
 
-## Demo
+## Демо
 
 ![Travel search demo](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/book.gif)
 
 <details>
-<summary>Example response</summary>
+<summary>Пример ответа</summary>
 
-![Request](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/request.webp)
-![Response part 1](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/response1.webp)
-![Response part 2](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/response2.webp)
+![Запрос](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/request.webp)
+![Ответ часть 1](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/response1.webp)
+![Ответ часть 2](https://github.com/MissiaL/travel-search-ru/releases/download/v1.0/response2.webp)
 
 </details>
 
-## Compatible agents
+## Совместимые агенты
 
-Works with any [agentskills.io](https://agentskills.io)-compatible AI agent:
+Работает с любым AI-агентом, поддерживающим [agentskills.io](https://agentskills.io):
 
-**Claude Code** · **Cursor** · **Gemini CLI** · **GitHub Copilot** · **Windsurf** · **Junie** · **OpenCode** · **Goose** · **Aider** · **Cline** · **Roo Code** · **Amp** · **VS Code Agent** and 30+ others
+**Claude Code** · **Cursor** · **Gemini CLI** · **GitHub Copilot** · **Windsurf** · **Junie** · **OpenCode** · **Goose** · **Aider** · **Cline** · **Roo Code** · **Amp** · **VS Code Agent** и 30+ других
 
-## Supported providers
+## Провайдеры
 
-| Provider | What | Data |
-|----------|------|------|
-| **Aviasales** | Flights | Cached prices from user searches (updated daily), all airlines |
-| **Travelata** | Package tours | Real-time search: flight + hotel, all-inclusive options |
-| **Sputnik8** | Excursions & activities | Tours, tickets, transfers in 900+ cities worldwide |
+| Провайдер | Что ищет | Данные |
+|-----------|----------|--------|
+| **Aviasales** | Авиабилеты | Кэшированные цены из поисков пользователей (обновляются ежедневно), все авиакомпании |
+| **Travelata** | Пакетные туры | Поиск в реальном времени: перелёт + отель, варианты «всё включено» |
+| **Sputnik8** | Экскурсии | Экскурсии, билеты, трансферы в 900+ городах мира |
 
-## How it works
+## Как это работает
 
 ```
-User: "Find flights from Moscow to Antalya in June for 2 adults and a child"
+Пользователь: «Найди авиабилеты из Москвы в Анталью в июне на 2 взрослых и ребёнка»
   │
   ▼
-Agent reads SKILL.md → calls APIs → formats results
+Агент читает SKILL.md → вызывает API → форматирует результаты
   │
-  ├─ Aviasales Data API → cached flight prices
-  ├─ Travelata API → package tour options
-  ├─ Sputnik8 API → excursions at destination
+  ├─ Aviasales Data API → кэшированные цены на перелёты
+  ├─ Travelata API → пакетные туры
+  ├─ Sputnik8 API → экскурсии на месте
   │
   ▼
-User gets prices, dates, airlines, hotels, and booking links
+Пользователь получает цены, даты, авиакомпании, отели и ссылки на бронирование
 ```
 
-## Installation
+## Установка
 
 ```bash
 git clone https://github.com/MissiaL/travel-search-ru.git travel-search-ru
 ```
 
-The directory name must be `travel-search-ru` to match the skill name.
+Имя директории должно совпадать с именем навыка: `travel-search-ru`.
 
-## Requirements
+## Требования
 
-- Python 3.8+ (stdlib only, no pip packages needed)
-- Internet access
+- Python 3.8+ (только стандартная библиотека, pip-пакеты не нужны)
+- Доступ в интернет
 
-## Usage examples
+## Примеры запросов
 
-Once installed, ask your AI agent anything about travel:
+После установки просто спросите AI-агента о путешествиях:
 
-**Flights**
-- "Find cheap flights from Moscow to Antalya in June"
-- "Compare flight prices to Istanbul for next month"
-- "Cheapest direct flights from Saint Petersburg to Dubai"
+**Авиабилеты**
+- «Найди дешёвые билеты из Москвы в Анталью в июне»
+- «Сравни цены на перелёт в Стамбул на следующий месяц»
+- «Самые дешёвые прямые рейсы из Питера в Дубай»
 
-**Package tours**
-- "Search tours to Turkey for 2 adults and 2 kids, 7 nights in May"
-- "Find all-inclusive tours to Egypt under 100,000 RUB"
+**Пакетные туры**
+- «Найди туры в Турцию на двоих с двумя детьми, 7 ночей в мае»
+- «Туры в Египет всё включено до 100 000 руб.»
 
-**Excursions**
-- "What excursions are available in Kemer?"
-- "Find top-rated activities in Istanbul"
-- "Best boat tours near Antalya"
+**Экскурсии**
+- «Какие экскурсии есть в Кемере?»
+- «Лучшие экскурсии в Стамбуле»
+- «Морские прогулки рядом с Антальей»
 
-**Combined**
-- "Plan a trip to Turkey: flights, hotel options, and things to do"
+**Комбинированные**
+- «Спланируй поездку в Турцию: перелёт, варианты отелей и что посмотреть»
 
-## API coverage
+## Покрытие API
 
-### Flights (Aviasales)
-- Cheapest tickets for specific dates
-- Price calendar (day-by-day)
-- Price trends and special offers
-- Popular destinations
-- Search by price range
-- Nearby airports matrix
+### Авиабилеты (Aviasales)
+- Самые дешёвые билеты на конкретные даты
+- Календарь цен (по дням)
+- Тренды цен и спецпредложения
+- Популярные направления
+- Поиск по диапазону цен
+- Матрица ближайших аэропортов
 
-### Tours (Travelata)
-- Tour search with filters (dates, nights, guests, meals, hotel rating)
-- Country, resort, and hotel directories
+### Туры (Travelata)
+- Поиск туров с фильтрами (даты, ночи, туристы, питание, рейтинг отеля)
+- Справочники стран, курортов и отелей
 
-### Excursions (Sputnik8)
-- Excursion search by city
-- Product details with pricing
-- City and country directories
-- Categories and reviews
+### Экскурсии (Sputnik8)
+- Поиск экскурсий по городу
+- Детали и цены
+- Справочники городов и стран
+- Категории и отзывы
 
-## License
+## Лицензия
 
 MIT
