@@ -1,97 +1,199 @@
 # Travelata API
 
-Package tours: flight + hotel. Uses the official Travelata API via Travelpayouts.
+Package tours: flight + hotel. Real-time search via Travelata partners API.
 
-## Search Endpoint
+## Endpoints
 
 ```text
-https://api.botclaw.ru/travelata/statistic/cheapestTours
+POST  https://api.botclaw.ru/travelata-partners/tours/asyncSearch
+GET   https://api.botclaw.ru/travelata-partners/tours/asyncSearch/{id}
+GET   https://api.botclaw.ru/travelata-partners/tours
+GET   https://api.botclaw.ru/travelata-partners/tours/{tourId}
+PATCH https://api.botclaw.ru/travelata-partners/tours/{tourId}
 ```
 
-Returns **one cheapest tour per check-in date** with hotel names, ratings, and booking links directly in the response.
+Results are live, not cached. Supports many tours per date, filtering by specific hotels, and kids' ages.
 
-## How It Works
+## Search Flow
 
-- The API returns the single cheapest tour for each day in the date range.
-- Not every day will have a result — some dates may have no available tours.
-- If the user asks for a specific date (e.g. "May 5"), always search a range of ±7 days around it (e.g. May 1–15) to find nearby options. Never search a single day — it often returns empty.
-- The API does NOT support `touristGroup[kidsAges][]` — only the total count of kids. The age of children does not affect search results.
+1. **Start async search** with `POST /tours/asyncSearch` — returns a search `id`.
+2. **Wait ~2 seconds** — most operators respond in under 1 second, this catches ~90% of results.
+3. **Fetch tours** with `GET /tours` using the same criteria.
 
-## Parameters
+No polling loop needed in normal usage. If the first fetch returns few results, you can wait another 2 seconds and re-fetch — results are cumulative.
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `countries[]` | yes | Country ID. Only ONE country per request |
-| `departureCity` | yes | Departure city ID |
-| `checkInDateRange[from]` | yes | Check-in date range start (YYYY-MM-DD) |
-| `checkInDateRange[to]` | yes | Check-in date range end (YYYY-MM-DD). Max 30 days from `[from]` |
-| `nightRange[from]` | yes | Minimum nights |
-| `nightRange[to]` | yes | Maximum nights |
-| `touristGroup[adults]` | yes | Adults count |
-| `touristGroup[kids]` | yes | Children count (2-11 years) |
-| `touristGroup[infants]` | yes | Infants count (under 2) |
-| `resorts[]` | no | Resort IDs (array). Use for exact area filtering |
-| `meals[]` | no | Meal type IDs (array) |
-| `hotelCategories[]` | no | Hotel star/category IDs (array) |
-| `ratingMin` | no | Minimum hotel rating |
-| `ratingMax` | no | Maximum hotel rating |
+### Step 1 — start search
 
-## Example Request
+```bash
+python scripts/api_call.py --method POST \
+  --url "https://api.botclaw.ru/travelata-partners/tours/asyncSearch" \
+  --body '{"departureCity":2,"country":92,"checkInDateRange":{"from":"2026-04-20","to":"2026-04-30"},"nightRange":{"from":"7","to":"10"},"touristGroup":{"adults":4,"kids":1,"infants":0,"kidsAges":[8]},"resorts":[2162]}'
+```
+
+Returns: `{"success":true,"result":{"id":"smartsearch_..."}}`. You can ignore the id if you don't poll.
+
+### Step 2 — fetch tours
 
 ```bash
 python scripts/api_call.py --method GET \
-  --url "https://api.botclaw.ru/travelata/statistic/cheapestTours" \
-  --params '{"countries[]":["92"],"departureCity":"2","nightRange[from]":"7","nightRange[to]":"10","touristGroup[adults]":"2","touristGroup[kids]":"0","touristGroup[infants]":"0","hotelCategories[]":["7","4"],"meals[]":["1","8"],"ratingMin":"4","checkInDateRange[from]":"2026-06-01","checkInDateRange[to]":"2026-06-30"}'
+  --url "https://api.botclaw.ru/travelata-partners/tours" \
+  --params '{"departureCity":"2","country":"92","checkInDateRange[from]":"2026-04-20","checkInDateRange[to]":"2026-04-30","nightRange[from]":"7","nightRange[to]":"10","touristGroup[adults]":"4","touristGroup[kids]":"1","touristGroup[infants]":"0","touristGroup[kidsAges][]":["8"],"resorts[]":["2162"],"sections[]":["hotels","meals"],"limit":"30"}'
 ```
 
-## Response Fields
+**Use the same criteria in asyncSearch and GET /tours** — otherwise results may be empty or partial.
+
+## Search Parameters (POST asyncSearch and GET /tours)
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `departureCity` | int | yes | Departure city ID (e.g. Moscow = 2) |
+| `country` | int | yes | Country ID. One country per request |
+| `checkInDateRange.from` | string | yes | Check-in range start (YYYY-MM-DD) |
+| `checkInDateRange.to` | string | yes | Check-in range end (YYYY-MM-DD) |
+| `nightRange.from` | int | yes | Minimum nights |
+| `nightRange.to` | int | yes | Maximum nights |
+| `touristGroup.adults` | int | yes | Adults (18+ years). Supports 4+ in a single search |
+| `touristGroup.kids` | int | yes | Children — anyone aged 2 through 17 inclusive (NOT just 2–11) |
+| `touristGroup.infants` | int | yes | Infants (under 2 years old at tour end) |
+| `touristGroup.kidsAges` | int array | **always when kids > 0** | Age of each child at tour end. Critical: omitting this defaults every child to 11, which breaks room placement and extra-bed pricing |
+| `priceRange.from` | int | no | Minimum price (RUB) |
+| `priceRange.to` | int | no | Maximum price (RUB) |
+| `resorts[]` | int array | no | Resort IDs |
+| `hotels[]` | int array | no | Hotel IDs — search a specific hotel or set of hotels |
+| `meals[]` | int array | no | Meal type IDs |
+| `hotelCategories[]` | int array | no | Hotel category (star) IDs |
+| `operators[]` | int array | no | Tour operator IDs |
+| `sections[]` | string array | GET only | Extra lookups in response — pass the names you need |
+| `limit` | int | GET only | Max tours in response. Default 500, max 3000 |
+
+### How to pass arrays via api_call.py
+
+For GET: use bracketed keys with array values — `api_call.py` uses `doseq=True`.
+
+```json
+{
+  "resorts[]": ["2162"],
+  "hotels[]": ["47624","105637"],
+  "touristGroup[kidsAges][]": ["8","5"],
+  "sections[]": ["hotels","meals"]
+}
+```
+
+For POST (body is JSON), use native arrays:
+
+```json
+{
+  "resorts": [2162],
+  "hotels": [47624, 105637],
+  "touristGroup": {"adults": 4, "kids": 1, "infants": 0, "kidsAges": [8]}
+}
+```
+
+### Useful `sections` values
+
+- `hotels` — names, photos, ratings, stars, beach distance, description
+- `meals` — meal type names
+- `hotelCategories` — category names ("5*", "4*", etc.)
+- `operators` — tour operator names
+- `routes`, `airlines`, `airports`, `rooms` — flight legs, room details
+
+Include only the sections you actually need — smaller sections = faster response.
+
+## Response Shape
+
+`GET /tours` returns `{"success":true,"result":{"tours":[...], "hotels":[...], "meals":[...]}}`.
+
+Each element of `tours` has:
 
 | Field | Description |
 |-------|-------------|
-| `tourIdentity` | Tour identity (used in booking URL) |
-| `price` | Total price in RUB |
-| `checkinDate` | Check-in date |
-| `nights` | Number of nights |
-| `hotelId` | Hotel ID |
-| `hotelName` | Hotel name (directly in response) |
-| `hotelCategory` | Hotel category ID |
-| `hotelCategoryName` | Hotel category as text (e.g. "5*") |
-| `hotelRating` | Hotel rating |
-| `hotelPreview` | Hotel image URL |
-| `mealId` | Meal type ID |
-| `resortId` | Resort ID |
-| `tourPageUrl` | Direct booking URL (ready to use) |
-| `searchPageUrl` | Search results page URL |
-| `operatorId` | Tour operator ID |
-| `expired` | Offer expiry time |
+| `id` | Tour ID (used to build the booking URL) |
+| `price` | Price in RUB |
+| `oilTax` | Fuel surcharge (added to `price`) |
+| `nights.hotel` | Nights in hotel |
+| `nights.tour` | Total tour nights (incl. flight) |
+| `checkInDate` | Check-in date |
+| `hotel` | Hotel ID — resolve via `sections[]=hotels` |
+| `hotelCategory` | Hotel category (star) ID |
+| `meal` | Meal type ID |
+| `resort` | Resort ID |
+| `operator` | Tour operator ID |
+| `room` | Room name (string) |
+| `transfer` | `none`, `group`, or `individual` — see caveat below |
+| `flightType` | `regular` or `charter` |
+| `medicalInsurance` | Whether basic insurance is included |
+
+**Transfer caveat:** for some operators (notably the one with `operator=26`) the `transfer` value at the search stage is a prediction based on historical data, not the operator's real answer. The real value only arrives after a `PATCH /tours/{id}` actualization. Don't promise a specific transfer type to the user before actualization — phrase it as "usually included" or "typically group transfer".
+
+The `hotels` section (when requested) gives you `id → {name, rating, cover, distances.beach, description, ...}`.
 
 ## Booking Links
 
-`tourPageUrl` is returned directly in the response. Always convert it through `/short-link`:
+The API does NOT return a ready URL. Construct it yourself from `tour.hotel` and `tour.id`:
+
+```text
+https://travelata.ru/hotel/{hotel}/tourPage?identity={tour.id}
+```
+
+Always convert through `/short-link`:
 
 ```bash
 python scripts/api_call.py --method GET \
   --url "https://api.botclaw.ru/short-link" \
-  --params '{"url":"https://travelata.ru/hotel/107259/tourPage?identity=<tourIdentity from response>"}'
+  --params '{"url":"https://travelata.ru/hotel/47624/tourPage?identity=<tour.id>"}'
 ```
 
 ## Search Strategy
 
-- **Always use a date range**, never a single day. If the user says "May 5", search `checkInDateRange[from]=2026-04-28` to `[to]=2026-05-12`.
-- If user says **Turkey**, use `countries[]=92` without `resorts[]`.
-- If user says **Antalya** in a tour context, start broad with `countries[]=92` unless they clearly mean only Antalya city.
-- If exact area matters, add `resorts[]` with the appropriate resort IDs.
-- Default quality filters: `hotelCategories[]` for 4-5 stars, `meals[]` for AI/UAI, `ratingMin=4`.
-- Present the best options from the results. Since the API returns one tour per day, show the cheapest 3-5 across the date range and note which check-in dates are available.
+- **Always search a date range**, never a single day. If the user says "May 5", use `checkInDateRange[from]=2026-04-28` to `[to]=2026-05-12`.
+- **Country first, resort second.** If the user says "Turkey", use `country=92` without `resorts[]`. Add `resorts[]` only when the user explicitly names a resort (Belek, Kemer, Side, Alanya).
+- **Broaden night range** — `{"from":"7","to":"10"}` is more forgiving than a strict 7.
+- **Default quality filters** for casual queries: `hotelCategories[]` for 4–5 stars, `meals[]` for all-inclusive or ultra-all-inclusive. Drop filters if empty.
+- **Always pass `kidsAges`** when `kids > 0`. The API silently defaults missing ages to 11, which produces wrong room placements and extra-bed pricing. Anyone aged 2–17 goes into `kids` (not just 2–11). If the user says "two kids, 5 and 14", that is `kids=2, kidsAges=[5,14]`. If the user only gives the count, pick a sensible default (e.g. `[8]` for one child, `[8,5]` for two) and note it in the response: "I'm searching with kids aged 8 — if their actual ages are different, let me know and I'll re-search."
+- **Sort by price client-side** — results come unordered; present the cheapest 5–10 to the user.
+- **Group by hotel** when showing many tours — the same hotel often has multiple price points.
 
-If strict filters return 0 results:
+If a filtered search returns 0 results:
 
-1. Retry WITHOUT any filters (no `hotelCategories`, `meals`, `ratingMin`) but keep the same date range and tourist group
-2. If still 0, widen the date range
-3. Only then say no tours are available
+1. Retry without `hotelCategories`, `meals`, `priceRange` — keep dates and tourist group
+2. Widen `nightRange` (e.g. 7–14 instead of 7–7)
+3. Widen `checkInDateRange`
+4. Only then tell the user no tours are available
 
-## Key IDs
+## Searching a Specific Hotel
 
-Look up all IDs dynamically via directory endpoints — see [travelata-directories.md](travelata-directories.md).
+Pass `hotels[]` with the hotel ID:
 
-Departure city IDs are in [assets/departure-cities.json](../assets/departure-cities.json).
+```json
+{
+  "hotels[]": ["47624"],
+  "departureCity": "2",
+  "country": "92",
+  "checkInDateRange[from]": "2026-04-20",
+  "checkInDateRange[to]": "2026-04-30",
+  "nightRange[from]": "7",
+  "nightRange[to]": "14",
+  "touristGroup[adults]": "4",
+  "touristGroup[kids]": "1",
+  "touristGroup[infants]": "0",
+  "touristGroup[kidsAges][]": ["8"],
+  "sections[]": ["hotels"]
+}
+```
+
+Still do `POST asyncSearch` first with the same `hotels` filter, wait ~2 seconds, then `GET /tours`.
+
+## Tour Actualization (before booking)
+
+Before sending the user to a booking link, you can refresh price and flights via:
+
+```bash
+python scripts/api_call.py --method PATCH \
+  --url "https://api.botclaw.ru/travelata-partners/tours/<tour.id>"
+```
+
+This can take up to 60 seconds — only use when the user is about to book, not during listing.
+
+## Directory Lookups
+
+See [travelata-directories.md](travelata-directories.md) for countries, resorts, meals, and hotel category IDs.
