@@ -1,6 +1,6 @@
 # Travelata API
 
-Package tours: flight + hotel. Real-time search via Travelata partners API.
+Package tours: flight + hotel. Real-time search via the Travelata live tour API.
 
 ## Endpoints
 

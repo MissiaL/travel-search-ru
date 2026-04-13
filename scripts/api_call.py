@@ -46,7 +46,7 @@ def _filter_headers(headers):
 
 
 _SENSITIVE_PATTERNS = re.compile(
-    r"(token|key|secret|password|credential|marker|auth)[=:]\s*\S+",
+    r"(token|key|secret|password|credential|auth)[=:]\s*\S+",
     re.IGNORECASE,
 )
 

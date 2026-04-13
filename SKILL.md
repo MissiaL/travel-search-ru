@@ -1,7 +1,7 @@
 ---
 name: travel-search-ru
 description: Search for flights, tours, and excursions with real prices and booking links. Use when the user asks about travel, flights, airfare, hotels, tours, excursions, vacations, or trip planning.
-metadata: {"author":"MissiaL","version":"1.0","keywords":["aviasales","travelata","sputnik8","tripster","flights","tours","excursions","travel","russia","turkey","egypt","booking"]}
+metadata: {"author":"MissiaL","version":"1.2.0","keywords":["aviasales","travelata","sputnik8","tripster","flights","tours","excursions","travel","russia","turkey","egypt","booking"]}
 ---
 
 # Travel Search
@@ -37,7 +37,7 @@ python scripts/api_call.py --method GET \
   --params '{"url":"https://www.aviasales.ru/search?origin_iata=MOW&destination_iata=AYT&depart_date=2026-06-01&return_date=2026-06-15&adults=1&children=0&infants=0&trip_class=0"}'
 ```
 
-### 2. Tours (Travelata)
+### 2. Tours (Travelata + Level.Travel)
 
 Package tours (flight + hotel). Real-time search with multiple tours per date, kids' ages, and search by specific hotel. Read [references/travelata-api.md](references/travelata-api.md) for the full flow and parameters. Use [references/travelata-directories.md](references/travelata-directories.md) only if you need to look up IDs.
 
@@ -71,6 +71,33 @@ python scripts/api_call.py --method GET \
 ```
 
 **Important:** always pass `kidsAges` when `kids > 0`. Always search a date range, never a single day. If filters return 0 results, the first thing to try is **re-fetching `GET /tours` with the same parameters after another 3-second wait** — most empty results on far destinations are caused by operators not having responded yet, NOT by overly strict filters. Only after the second fetch is still empty should you drop filters or widen dates.
+
+#### Level.Travel
+
+For 2-adult tours of 7-15 nights within roughly the next 30 days, also call
+Level.Travel in parallel with Travelata. Level.Travel is a cached snapshot, not
+live search, so it usually returns immediately while Travelata keeps running.
+
+Skip Level.Travel for families with kids, solo travelers, 3+ adults, trips
+shorter than 7 nights, longer than 15 nights, far-future dates, and requests
+that require a strict meal plan.
+
+See [references/leveltravel-api.md](references/leveltravel-api.md) for the full
+decision table, parameters, response shape, and departure-key list.
+
+**Quick example:**
+```bash
+python scripts/api_call.py --method GET \
+  --url "https://api.botclaw.ru/leveltravel/tours" \
+  --params '{"departure_key":"moscow","country_iso2":"TR","date_from":"2026-05-01","date_to":"2026-05-15","nights_min":"7","nights_max":"10","stars_min":"4","limit":"20"}'
+```
+
+The response includes `feed_synced_at` and `feed_age_hours`. Mention to the user
+that Level.Travel data comes from that snapshot, and warn more strongly when
+`feed_age_hours > 12`.
+
+Convert every `hotel_url` through `/short-link` before showing it, exactly like
+Travelata and Aviasales URLs.
 
 ### 3. Excursions (Sputnik8)
 
@@ -108,10 +135,10 @@ python scripts/api_call.py --method GET \
 - For tours: if results are few (under 3) or none match the user's preferences well, recommend checking more options on these services:
   - [Яндекс Путешествия](https://yandex.tpm.lv/6B8T7GjP)
   - [Ostrovok](https://ostrovok.tpm.lv/LjsjLi2L)
-  - [Level.travel](https://level.tpm.lv/NBoUxZ6p)
 - For tours with a budget: if results exceed budget, present the cheapest options clearly marked as "above budget".
 - For tours with an exact area request: pass `resorts[]` (array format). Verify the returned `resort` field in each tour matches the requested ID.
 - For combined requests (flights + tours): search both and compare
 - Prices from Data API are cached (2-7 days old) — mention this to users. If no data found for requested dates, the API automatically returns nearest available dates.
 - When user asks for tours plus excursions, always search Sputnik8 too, even if tour results are empty or only slightly above budget.
 - When showing flight or tour results, suggest searching for activities and excursions at the destination via Sputnik8 (e.g. "Want me to find excursions and things to do in Antalya?")
+- For tours: when the query fits Level.Travel constraints (2 adults, 7-15 nights, near-term dates), call both Travelata and Level.Travel in parallel. Present merged results, label each tour with its source, and mention that Level.Travel data is a cached snapshot using `feed_age_hours`. When the query does not fit Level.Travel constraints, silently use Travelata only.

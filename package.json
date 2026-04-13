@@ -1,6 +1,6 @@
 {
   "name": "travel-search-ru",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Agent skill for searching flights, tours, and excursions via Travelpayouts",
   "keywords": ["agent-skill", "travel", "flights", "tours", "excursions", "aviasales", "travelata", "sputnik8", "tripster", "russia", "turkey", "egypt", "booking"],
   "author": "MissiaL",

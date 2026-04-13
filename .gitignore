@@ -5,3 +5,5 @@ docs/
 *.png
 *.gif
 *.webp
+__pycache__/
+*.pyc

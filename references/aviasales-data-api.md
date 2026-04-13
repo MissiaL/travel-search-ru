@@ -234,7 +234,6 @@ Prices for each day of a month, grouped by number of transfers.
 | month | string | — | `YYYY-MM-DD` (first day of month) |
 | one_way | bool | true | — |
 | trip_duration | int | — | Stay length in weeks |
-| show_to_affiliates | bool | true | true=verified prices only (recommended) |
 | limit | int | 30 | Set 31 for 31-day months |
 | market | string | ru | — |
 
@@ -267,7 +266,6 @@ Prices for a 7-day window (±3–4 days) around specified departure/return dates
 | currency | string | RUB | — |
 | depart_date | string | — | `YYYY-MM-DD` or `YYYY-MM` |
 | return_date | string | — | `YYYY-MM-DD` or `YYYY-MM` |
-| show_to_affiliates | bool | true | — |
 | market | string | ru | — |
 
 **Example:**
@@ -302,7 +300,6 @@ Prices including nearby airports for origin and destination.
 | return_date | string | — | `YYYY-MM` (optional) |
 | flexibility | int | 0 | Date range ±days (0–7) |
 | distance | int | — | Search radius in km |
-| show_to_affiliates | bool | true | — |
 | market | string | ru | — |
 
 **Example:**
@@ -318,6 +315,9 @@ r = requests.get("https://api.botclaw.ru/v2/prices/nearest-places-matrix",
    "return_date":"2026-05-17","number_of_changes":0,"found_at":"2026-03-28T10:00:00Z","actual":true}
 ], "origins":["MOW"], "destinations":["LED"]}
 ```
+
+For the v2 price-matrix endpoints, keep the default verified-prices behavior and
+do not add extra filtering flags unless you have a documented reason.
 
 ---
 
