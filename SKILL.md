@@ -1,7 +1,7 @@
 ---
 name: travel-search-ru
 description: Search flights via Aviasales, tours via Travelata + Level.Travel, and excursions via Sputnik8 with real prices and booking links. Use when the user asks about travel, flights, airfare, hotels, tours, excursions, vacations, or trip planning.
-metadata: {"author":"MissiaL","version":"1.2.2","keywords":["aviasales","travelata","leveltravel","sputnik8","tripster","flights","tours","excursions","travel","russia","turkey","egypt","booking"]}
+metadata: {"author":"MissiaL","version":"1.2.3","keywords":["aviasales","travelata","leveltravel","sputnik8","tripster","flights","tours","excursions","travel","russia","turkey","egypt","booking"]}
 ---
 
 # Travel Search
@@ -151,8 +151,9 @@ python scripts/api_call.py --method GET \
 
 ## Presentation Rules
 
-- Keep answers compact and easy to scan: show the best 3–5 options first, then a short conclusion about which option fits best and why.
-- Use one emoji marker per line at most. Good defaults: `✈️`, `🏨`, `⭐`, `🍽️`, `📅`, `💰`, `🔁`, `🧳`, `🔗`, `🎯`.
-- For flights, prefer this order: route, dates, price, baggage/fare notes if available, direct or with transfers, then booking link.
-- For tours, prefer this order: hotel, stars, actual resort/subzone, rating, meal, check-in and nights, price, short fit note, then booking link.
-- For tours, present hotels rather than a raw list of duplicate tours. If the same hotel has multiple offers, show the cheapest relevant one unless the user asks to compare all variants.
+- Keep answers compact and easy to scan: by default, show 5–8 strong options, then a short conclusion about which option fits best and why. Show more only if the user asks.
+- Prefer a calm text layout over decorative formatting. Do not use a colorful emoji-heavy line-by-line style.
+- For flights, show 5–8 options by default. Prefer this order inside each option: route, dates, price, baggage or fare notes if available, direct or with transfers, then booking link.
+- For tours, show 5–8 hotels by default, not 5–8 raw duplicate offers. If the same hotel has multiple offers, show the cheapest relevant one unless the user asks to compare variants.
+- For tours, prefer this order inside each option: hotel, stars, actual resort/subzone, rating, meal, check-in and nights, price, short "Why it's in the list" note, then booking link.
+- If there is a clear geographic split, separate the answer into sections such as `Best options in Kemer` and `If you expand beyond Kemer`. Do not mix them into one flat list.

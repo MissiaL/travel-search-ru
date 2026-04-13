@@ -23,17 +23,24 @@ Do not let a cheaper but worse-fit option outrank a clearly better match.
 - If the user asked for "family hotel", explain briefly why the hotel fits: beach, meals, family format, stronger reviews, calmer location.
 - If nothing fits perfectly, show the best in-scope options first and then ask whether to widen filters or geography.
 
+## Shortlist Size
+
+- Default to 5–8 hotels, not a giant dump of raw offers.
+- One hotel should usually appear only once in the main shortlist.
+- Show more only when the user explicitly asks for a longer list or a deeper comparison.
+
 ## Compact Output Format
 
-For tours, keep each option short:
+For tours, keep each option short and calm. Prefer sections over decorative markers:
 
 ```text
-🏨 Hotel Name, 4*
-⭐ Rating: 4.7
-📍 Area: Kemer / Goynuk
-🍽️ Meal: Ultra all inclusive
-📅 Check-in: 2026-04-25, 7 nights
-💰 Price: from 187 000 RUB
-🎯 Why it fits: strong family reviews, close to beach
-🔗 <short link>
+Best options in Kemer
+
+1. Hotel Name, 4*, Kemer / Goynuk
+Rating: 4.7
+Meal: Ultra all inclusive
+Dates: 25 April, 7 nights
+Price: from 187 000 RUB
+Why it's in the list: strong family reviews, close to beach
+Link: <short link>
 ```
