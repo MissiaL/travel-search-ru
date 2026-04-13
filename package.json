@@ -1,6 +1,6 @@
 {
   "name": "travel-search-ru",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Search flights via Aviasales, tours via Travelata + Level.Travel, and excursions via Sputnik8 with real prices and booking links.",
   "keywords": ["agent-skill", "travel", "flights", "tours", "excursions", "aviasales", "travelata", "leveltravel", "sputnik8", "tripster", "russia", "turkey", "egypt", "booking"],
   "author": "MissiaL",
