@@ -19,6 +19,12 @@ python scripts/api_call.py --method POST --url "<URL>" --body '<JSON>'
 
 `--params`, `--body`, and `--headers` must be valid JSON objects. Do not pass query strings like `a=1&b=2`.
 
+## Scope
+
+- This skill finds flights, tours, and excursions, compares options, and returns booking links.
+- This skill does **not** make bookings, store personal travel data, access email/calendar, or maintain a long-term travel workspace.
+- For exact-area tour requests, keep the requested geography unless the user explicitly agrees to broaden it.
+
 ### 1. Flights (Aviasales)
 
 Cached flight prices. Read [references/aviasales-data-api.md](references/aviasales-data-api.md) for all endpoints and parameters.
@@ -39,7 +45,7 @@ python scripts/api_call.py --method GET \
 
 ### 2. Tours (Travelata + Level.Travel)
 
-Package tours (flight + hotel). Real-time search with multiple tours per date, kids' ages, and search by specific hotel. Read [references/travelata-api.md](references/travelata-api.md) for the full flow and parameters. Use [references/travelata-directories.md](references/travelata-directories.md) only if you need to look up IDs.
+Package tours (flight + hotel). Real-time search with multiple tours per date, kids' ages, and search by specific hotel. Read [references/travelata-api.md](references/travelata-api.md) for the full flow and parameters. Use [references/travelata-directories.md](references/travelata-directories.md) only if you need to look up IDs. Use [references/tour-selection-playbook.md](references/tour-selection-playbook.md) when you need to rank, group, and present a shortlist cleanly.
 
 **Two-step flow:** start an async search, wait, then fetch tours. Use the **same criteria** in both calls.
 
@@ -136,9 +142,17 @@ python scripts/api_call.py --method GET \
   - [Яндекс Путешествия](https://yandex.tpm.lv/6B8T7GjP)
   - [Ostrovok](https://ostrovok.tpm.lv/LjsjLi2L)
 - For tours with a budget: if results exceed budget, present the cheapest options clearly marked as "above budget".
-- For tours with an exact area request: pass `resorts[]` (array format). Verify the returned `resort` field in each tour matches the requested ID.
+- For tours with an exact area request: pass `resorts[]` (array format). Treat the returned tours as valid area matches even when the API returns a more specific child resort/subzone inside that area. Show the actual subzone in the response, but do **not** silently broaden to a different resort cluster or region unless the user agrees.
 - For combined requests (flights + tours): search both and compare
 - Prices from Data API are cached (2-7 days old) — mention this to users. If no data found for requested dates, the API automatically returns nearest available dates.
 - When user asks for tours plus excursions, always search Sputnik8 too, even if tour results are empty or only slightly above budget.
 - When showing flight or tour results, suggest searching for activities and excursions at the destination via Sputnik8 (e.g. "Want me to find excursions and things to do in Antalya?")
 - For tours: when the query fits Level.Travel constraints (2 adults, 7-15 nights, near-term dates), call both Travelata and Level.Travel in parallel. Present merged results, label each tour with its source, and mention that Level.Travel data is a cached snapshot using `feed_age_hours`. When the query does not fit Level.Travel constraints, silently use Travelata only.
+
+## Presentation Rules
+
+- Keep answers compact and easy to scan: show the best 3–5 options first, then a short conclusion about which option fits best and why.
+- Use one emoji marker per line at most. Good defaults: `✈️`, `🏨`, `⭐`, `🍽️`, `📅`, `💰`, `🔁`, `🧳`, `🔗`, `🎯`.
+- For flights, prefer this order: route, dates, price, baggage/fare notes if available, direct or with transfers, then booking link.
+- For tours, prefer this order: hotel, stars, actual resort/subzone, rating, meal, check-in and nights, price, short fit note, then booking link.
+- For tours, present hotels rather than a raw list of duplicate tours. If the same hotel has multiple offers, show the cheapest relevant one unless the user asks to compare all variants.

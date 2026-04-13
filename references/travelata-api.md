@@ -153,6 +153,7 @@ python scripts/api_call.py --method GET \
 
 - **Always search a date range**, never a single day. If the user says "May 5", use `checkInDateRange[from]=2026-04-28` to `[to]=2026-05-12`.
 - **Country first, resort second.** If the user says "Turkey", use `country=92` without `resorts[]`. Add `resorts[]` only when the user explicitly names a resort (Belek, Kemer, Side, Alanya).
+- **For exact-area requests, trust the search filter, not a post-filter.** If you searched with `resorts[]`, do not throw away results just because the response shows a more specific child resort or subzone. Show that subzone to the user. Only broaden into a different resort cluster or region after explicit user approval.
 - **Broaden night range** — `{"from":"7","to":"10"}` is more forgiving than a strict 7.
 - **Default quality filters** for casual queries: `hotelCategories[]` for 4–5 stars, `meals[]` for all-inclusive or ultra-all-inclusive. Drop filters if empty.
 - **Always pass `kidsAges`** when `kids > 0`. The API silently defaults missing ages to 11, which produces wrong room placements and extra-bed pricing. Anyone aged 2–17 goes into `kids` (not just 2–11). If the user says "two kids, 5 and 14", that is `kids=2, kidsAges=[5,14]`. If the user only gives the count, pick a sensible default (e.g. `[8]` for one child, `[8,5]` for two) and note it in the response: "I'm searching with kids aged 8 — if their actual ages are different, let me know and I'll re-search."
@@ -168,6 +169,13 @@ If a filtered search returns 0 results, do NOT immediately relax filters. The ca
 5. Only after all of the above tell the user no tours are available
 
 Each step also costs a request against the 30/min rate limit on the demo account, so be deliberate — don't blast through all 4 steps in 2 seconds.
+
+## Presenting Exact-Area Results
+
+- If the user asked for a specific area such as Kemer, Belek, Side, or Alanya, keep the shortlist inside that area search.
+- It is normal for the response to show a more specific subzone rather than the top-level requested resort. Present the subzone as part of the hotel line.
+- If the shortlist is weak but still inside the requested area, show the best in-area options first.
+- Only after that ask whether the user wants to expand to nearby resort clusters or the whole coast.
 
 ## Searching a Specific Hotel
 
