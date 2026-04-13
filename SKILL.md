@@ -41,7 +41,11 @@ python scripts/api_call.py --method GET \
 
 Package tours (flight + hotel). Real-time search with multiple tours per date, kids' ages, and search by specific hotel. Read [references/travelata-api.md](references/travelata-api.md) for the full flow and parameters. Use [references/travelata-directories.md](references/travelata-directories.md) only if you need to look up IDs.
 
-**Two-step flow:** start an async search, wait ~2 seconds, then fetch tours. Use the **same criteria** in both calls.
+**Two-step flow:** start an async search, wait, then fetch tours. Use the **same criteria** in both calls.
+
+- **Wait 3 seconds** for nearby destinations (Turkey, Egypt, UAE, Cyprus, Greece)
+- **Wait 5 seconds** for far destinations (Vietnam, Thailand, Bali/Indonesia, Cuba, Dominican Republic, Maldives, Mexico) — operators take longer
+- **If the first fetch returns fewer than ~30 tours, wait another 3 seconds and re-fetch with the SAME parameters** before trying anything else. Operators stream results into the same search; the second fetch usually picks up the rest. This is the most important fix for empty results on far destinations.
 
 **Step 1 — start search:**
 ```bash
@@ -66,7 +70,7 @@ python scripts/api_call.py --method GET \
   --params '{"url":"https://travelata.ru/hotel/<tour.hotel>/tourPage?identity=<tour.id>"}'
 ```
 
-**Important:** always pass `kidsAges` when `kids > 0`. Always search a date range, never a single day. If filters return 0 results, retry without filters first, then widen the date range.
+**Important:** always pass `kidsAges` when `kids > 0`. Always search a date range, never a single day. If filters return 0 results, the first thing to try is **re-fetching `GET /tours` with the same parameters after another 3-second wait** — most empty results on far destinations are caused by operators not having responded yet, NOT by overly strict filters. Only after the second fetch is still empty should you drop filters or widen dates.
 
 ### 3. Excursions (Sputnik8)
 
@@ -99,7 +103,7 @@ python scripts/api_call.py --method GET \
 - For flights: show cached prices from Data API + link to full search on aviasales.ru
 - For tours: default to 4-5 star, all-inclusive. Always search a date range (±7 days from requested date), never a single day. Show hotel name, stars, meal, price, check-in date, and booking link. Group multiple tours of the same hotel together — show the cheapest 5–10 hotels rather than 5–10 raw tours.
 - For tours: anyone aged 2–17 goes into `touristGroup.kids` (not adults). Always pass `touristGroup.kidsAges[]` with the age of each child — without it the API silently defaults to age 11 and may return wrong room layouts. If the user gives count but not ages, pick a sensible default (e.g. 8) and tell the user you assumed it.
-- For tours: if strict filters return 0, retry WITHOUT filters first (same dates and tourists), then widen the night range, then the date range. Only say "no tours" if the unfiltered search is also empty.
+- For tours: if a search returns 0 (or under ~30 results for popular routes), the FIRST retry must be a second `GET /tours` with the same parameters after waiting another 3 seconds — operators may not have answered yet, especially for Vietnam, Cuba, Dominican Republic, Bali, Maldives. Only AFTER that second fetch is still empty should you drop filters, then widen night range, then widen date range. Do not blast through retries — each is a separate API call.
 - For tours: search by specific hotel using `hotels[]` when the user names a hotel.
 - For tours: if results are few (under 3) or none match the user's preferences well, recommend checking more options on these services:
   - [Яндекс Путешествия](https://yandex.tpm.lv/6B8T7GjP)

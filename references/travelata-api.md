@@ -17,10 +17,16 @@ Results are live, not cached. Supports many tours per date, filtering by specifi
 ## Search Flow
 
 1. **Start async search** with `POST /tours/asyncSearch` — returns a search `id`.
-2. **Wait ~2 seconds** — most operators respond in under 1 second, this catches ~90% of results.
+2. **Wait** before fetching:
+   - Close destinations (Turkey, Egypt, UAE, Cyprus, Greece): ~3 seconds
+   - Far destinations (Vietnam, Thailand, Indonesia/Bali, Cuba, Dominican Republic, Maldives, Mexico): ~5 seconds
+   - When in doubt, use 5 seconds — operators take longer for long-haul tours
 3. **Fetch tours** with `GET /tours` using the same criteria.
+4. **If you got fewer than ~30 tours,** wait another 3 seconds and re-fetch with the same parameters. The first fetch may have arrived before all tour operators responded — results from later operators show up on subsequent fetches without restarting the search. This is "soft polling": cheaper than the dedicated polling endpoint, and it gives the operators time to finish.
 
-No polling loop needed in normal usage. If the first fetch returns few results, you can wait another 2 seconds and re-fetch — results are cumulative.
+Only after a second fetch returns the same low/empty result should you start relaxing filters — see "Search Strategy" below.
+
+Do not use the dedicated `GET /tours/asyncSearch/{id}` polling endpoint in normal flow — it eats rate limit without giving you the tours, and a re-fetch of `GET /tours` already does the job.
 
 ### Step 1 — start search
 
@@ -153,12 +159,15 @@ python scripts/api_call.py --method GET \
 - **Sort by price client-side** — results come unordered; present the cheapest 5–10 to the user.
 - **Group by hotel** when showing many tours — the same hotel often has multiple price points.
 
-If a filtered search returns 0 results:
+If a filtered search returns 0 results, do NOT immediately relax filters. The cause is often that operators haven't responded yet, especially for far destinations. Try in this order:
 
-1. Retry without `hotelCategories`, `meals`, `priceRange` — keep dates and tourist group
-2. Widen `nightRange` (e.g. 7–14 instead of 7–7)
-3. Widen `checkInDateRange`
-4. Only then tell the user no tours are available
+1. **Wait 3 more seconds and re-fetch `GET /tours` with the same criteria.** No new asyncSearch — operators stream results into the same search. This step alone fixes most empty-result cases for Vietnam, Cuba, Dominican Republic, Bali, etc.
+2. If still empty: drop `hotelCategories`, `meals`, `priceRange` — keep dates and tourist group
+3. Widen `nightRange` (e.g. 7–14 instead of 7–7)
+4. Widen `checkInDateRange` (e.g. ±10 days instead of ±7)
+5. Only after all of the above tell the user no tours are available
+
+Each step also costs a request against the 30/min rate limit on the demo account, so be deliberate — don't blast through all 4 steps in 2 seconds.
 
 ## Searching a Specific Hotel
 
