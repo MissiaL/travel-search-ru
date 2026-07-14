@@ -67,6 +67,36 @@ git clone https://github.com/MissiaL/travel-search-ru.git travel-search-ru
 
 Имя директории должно совпадать с именем навыка: `travel-search-ru`.
 
+## MCP-сервер
+
+Тот же поиск доступен через удалённый MCP-сервер. Навык и ключи не нужны.
+Это вариант для агентов, которые поддерживают MCP, но не Agent Skills.
+
+**Endpoint:** `https://mcp.botclaw.ru/travel` (Streamable HTTP, без авторизации, только чтение)
+
+```bash
+claude mcp add --transport http travel-search-ru https://mcp.botclaw.ru/travel
+```
+
+Или в конфиге агента:
+
+```json
+{
+  "mcpServers": {
+    "travel-search-ru": {
+      "url": "https://mcp.botclaw.ru/travel"
+    }
+  }
+}
+```
+
+**Тулы:** `search_tours` (пакетные туры), `search_hotels` (отели без перелёта),
+`get_tour_details` (актуализация тура перед бронированием), `search_flights`,
+`get_flight_price_calendar`, `search_activities`, `list_destinations`.
+
+Навык и MCP — два способа пользоваться одним и тем же поиском: навык даёт агенту
+инструкции и ходит в API сам, MCP отдаёт готовые тулы.
+
 ## Требования
 
 - Python 3.8+ (только стандартная библиотека, pip-пакеты не нужны)
