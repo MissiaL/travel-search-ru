@@ -1,7 +1,7 @@
 ---
 name: travel-search-ru
 description: Search flights via Aviasales, tours via Travelata + Level.Travel, and excursions via Sputnik8 with real prices and booking links. Use when the user asks about travel, flights, airfare, hotels, tours, excursions, vacations, or trip planning.
-metadata: {"author":"MissiaL","version":"1.2.3","keywords":["aviasales","travelata","leveltravel","sputnik8","tripster","flights","tours","excursions","travel","russia","turkey","egypt","booking"]}
+metadata: {"author":"MissiaL","version":"1.3.0","keywords":["aviasales","travelata","leveltravel","sputnik8","tripster","flights","tours","excursions","travel","russia","turkey","egypt","booking"]}
 ---
 
 # Travel Search
@@ -45,9 +45,11 @@ python scripts/api_call.py --method GET \
 
 ### 2. Tours (Travelata + Level.Travel)
 
-Package tours (flight + hotel). Real-time search with multiple tours per date, kids' ages, and search by specific hotel. Read [references/travelata-api.md](references/travelata-api.md) for the full flow and parameters. Use [references/travelata-directories.md](references/travelata-directories.md) only if you need to look up IDs. Use [references/tour-selection-playbook.md](references/tour-selection-playbook.md) when you need to rank, group, and present a shortlist cleanly.
+Package tours (flight + hotel). Real-time search from **both** Travelata and Level.Travel — same tier, every tour request. Multiple tours per date, kids' ages, meal filters (Travelata server-side; Level.Travel via `pansion_prices` in results), and search by specific hotel. Read [references/travelata-api.md](references/travelata-api.md) and [references/leveltravel-api.md](references/leveltravel-api.md) for full flows and parameters. Use [references/travelata-directories.md](references/travelata-directories.md) only if you need to look up Travelata IDs. Use [references/tour-selection-playbook.md](references/tour-selection-playbook.md) when you need to rank, group, and present a shortlist cleanly.
 
-**Two-step flow:** start an async search, wait, then fetch tours. Use the **same criteria** in both calls.
+**On any tour request, start both async searches in one step**, wait once, then fetch both result sets and merge. Label which source each hotel/tour came from.
+
+**Two-step flow (Travelata):** start an async search, wait, then fetch tours. Use the **same criteria** in both calls.
 
 - **Wait 3 seconds** for nearby destinations (Turkey, Egypt, UAE, Cyprus, Greece)
 - **Wait 5 seconds** for far destinations (Vietnam, Thailand, Bali/Indonesia, Cuba, Dominican Republic, Maldives, Mexico) — operators take longer
@@ -80,30 +82,23 @@ python scripts/api_call.py --method GET \
 
 #### Level.Travel
 
-For 2-adult tours of 7-15 nights within roughly the next 30 days, also call
-Level.Travel in parallel with Travelata. Level.Travel is a cached snapshot, not
-live search, so it usually returns immediately while Travelata keeps running.
+Full live async tour search (flight+hotel or hotel-only). Same tier as Travelata: on **any** tour request, start Level.Travel enqueue **together with** Travelata `asyncSearch`, wait once (use the longer wait if they differ — Level.Travel needs ~7 s nearby / ~10 s far), then fetch both result sets and merge. Label each option with its source.
 
-Skip Level.Travel for families with kids, solo travelers, 3+ adults, trips
-shorter than 7 nights, longer than 15 nights, far-future dates, and requests
-that require a strict meal plan.
+See [references/leveltravel-api.md](references/leveltravel-api.md) for endpoints, parameters, response shape, departure cities, and link construction.
 
-See [references/leveltravel-api.md](references/leveltravel-api.md) for the full
-decision table, parameters, response shape, and departure-key list.
-
-**Quick example:**
+**Quick example — enqueue, then fetch hotels:**
 ```bash
 python scripts/api_call.py --method GET \
-  --url "https://api.botclaw.ru/leveltravel/tours" \
-  --params '{"departure_key":"moscow","country_iso2":"TR","date_from":"2026-05-01","date_to":"2026-05-15","nights_min":"7","nights_max":"10","stars_min":"4","limit":"20"}'
+  --url "https://api.botclaw.ru/leveltravel/search/enqueue" \
+  --params '{"from_city":"Moscow","to_country":"TR","adults":"2","start_date":"28.07.2026","nights":"7..9","kids":"0"}'
+```
+```bash
+python scripts/api_call.py --method GET \
+  --url "https://api.botclaw.ru/leveltravel/search/get_grouped_hotels" \
+  --params '{"request_id":"<request_id>","limit":"15"}'
 ```
 
-The response includes `feed_synced_at` and `feed_age_hours`. Mention to the user
-that Level.Travel data comes from that snapshot, and warn more strongly when
-`feed_age_hours > 12`.
-
-Convert every `hotel_url` through `/short-link` before showing it, exactly like
-Travelata and Aviasales URLs.
+**Notes:** enqueue `start_date` is **DD.MM.YYYY**; site booking links use **YYYY-MM-DD** for `start_date`. Always pass `kids` + `kids_ages[]` when kids > 0. Pass `limit=10..20` on `get_grouped_hotels`. Meal/board is chosen client-side from each hotel's `pansion_prices` keys (no meal param on enqueue). Build `https://level.travel{hotel.link}?start_date=YYYY-MM-DD&nights=N&adults=N`, then convert every link through `/short-link` before showing it.
 
 ### 3. Excursions (Sputnik8)
 
@@ -132,7 +127,7 @@ python scripts/api_call.py --method GET \
 
 ## Rules
 
-- **ALWAYS** convert ALL URLs to short links via `/short-link` before showing to users — this applies to Aviasales, Travelata, AND Sputnik8 links. Never show raw URLs from API responses directly.
+- **ALWAYS** convert ALL URLs to short links via `/short-link` before showing to users — this applies to Aviasales, Travelata, Level.Travel, AND Sputnik8 links. Never show raw URLs from API responses directly.
 - For flights: show cached prices from Data API + link to full search on aviasales.ru
 - For tours: default to 4-5 star, all-inclusive. Always search a date range (±7 days from requested date), never a single day. Show hotel name, stars, meal, price, check-in date, and booking link. Group multiple tours of the same hotel together — show the cheapest 5–10 hotels rather than 5–10 raw tours.
 - For tours: anyone aged 2–17 goes into `touristGroup.kids` (not adults). Always pass `touristGroup.kidsAges[]` with the age of each child — without it the API silently defaults to age 11 and may return wrong room layouts. If the user gives count but not ages, pick a sensible default (e.g. 8) and tell the user you assumed it.
@@ -147,7 +142,7 @@ python scripts/api_call.py --method GET \
 - Prices from Data API are cached (2-7 days old) — mention this to users. If no data found for requested dates, the API automatically returns nearest available dates.
 - When user asks for tours plus excursions, always search Sputnik8 too, even if tour results are empty or only slightly above budget.
 - When showing flight or tour results, suggest searching for activities and excursions at the destination via Sputnik8 (e.g. "Want me to find excursions and things to do in Antalya?")
-- For tours: when the query fits Level.Travel constraints (2 adults, 7-15 nights, near-term dates), call both Travelata and Level.Travel in parallel. Present merged results, label each tour with its source, and mention that Level.Travel data is a cached snapshot using `feed_age_hours`. When the query does not fit Level.Travel constraints, silently use Travelata only.
+- For tours: always start both Travelata (`POST asyncSearch`) and Level.Travel (`GET search/enqueue`) on any tour request, wait once (longer of the two waits if they differ), then fetch both (`GET /tours` and `GET search/get_grouped_hotels`). Present merged results and label each hotel/tour with its source.
 
 ## Presentation Rules
 

@@ -1,150 +1,284 @@
 # Level.Travel API
 
-Package tours from a cached snapshot source. Use it in parallel with Travelata
-only when the user's query fits Level.Travel's hard scope limits.
+Package tours (flight + hotel) and hotel-only offers via Level.Travel live async search.
+Same tier as Travelata: call both on every tour request, wait once, fetch both result sets,
+merge and label the source of each option.
 
-Level.Travel is a minimum-price snapshot refreshed every few hours. It is not a
-live search API. Responses come back quickly because they read from a prepared
-index. When you show Level.Travel results, mention `feed_age_hours` so the user
-understands how fresh the snapshot is.
+Base URL: `https://api.botclaw.ru/leveltravel/`
 
-## Scope
-
-Level.Travel accepts:
-
-- Exactly 2 adults, 0 kids, 0 infants
-- 7 to 15 nights inclusive
-- Check-in within roughly the next 30 days
-- Any supported departure key from `assets/leveltravel-departure-cities.json`
-
-Level.Travel does not support:
-
-- Families with kids or infants
-- Solo travelers
-- 3 or more adults
-- Trips shorter than 7 nights or longer than 15 nights
-- Far-future dates
-- Strict meal-plan filtering, because the feed has no meal field
-
-When a query does not fit this scope, skip Level.Travel silently and use
-Travelata only. Do not explain tool-selection logic to the user.
-
-## Decision Table
-
-| User query | Level.Travel | Travelata |
-|---|---|---|
-| 2 adults, 7-14 nights, next month | Yes, in parallel | Yes, in parallel |
-| 2 adults and 1 child | No | Yes |
-| 1 adult | No | Yes |
-| 3+ adults | No | Yes |
-| Strict all-inclusive only | No, feed has no meal field | Yes |
-| Tour shorter than 7 nights | No | Yes |
-| Tour for 5+ months out | No | Yes |
-| Specific hotel by name | Yes, with `hotel_name` | Yes, with `hotels[]` |
-| Ski tours in Russia | Yes, use `departure_key=ski` | Yes, but inventory may differ |
-
-## Endpoint
+## Endpoints
 
 ```text
-GET https://api.botclaw.ru/leveltravel/tours
+GET  https://api.botclaw.ru/leveltravel/search/enqueue
+GET  https://api.botclaw.ru/leveltravel/search/status
+GET  https://api.botclaw.ru/leveltravel/search/get_grouped_hotels
+GET  https://api.botclaw.ru/leveltravel/search/hotel_rooms
+GET  https://api.botclaw.ru/leveltravel/packages/package_details
+GET  https://api.botclaw.ru/leveltravel/references/departures
+GET  https://api.botclaw.ru/leveltravel/references/destinations
+GET  https://api.botclaw.ru/leveltravel/references/hotels
 ```
 
-| Param | Type | Required | Example | Notes |
-|---|---|---|---|---|
-| `departure_key` | string | yes | `moscow` | Must exist in `assets/leveltravel-departure-cities.json` |
-| `country_iso2` | string | no | `TR` | Destination country ISO2 |
-| `region` | string | no | `Кемер` | Exact match on Russian region name |
-| `departure_city` | string | no | `Москва` | Mainly for `departure_key=ski` |
-| `date_from` | ISO date | no | `2026-05-01` | Lower bound on check-in |
-| `date_to` | ISO date | no | `2026-05-15` | Upper bound on check-in |
-| `nights_min` | int | no | `7` | Must be in 7..15 |
-| `nights_max` | int | no | `10` | Must be in 7..15 |
-| `stars_min` | int | no | `4` | 1..5, excludes unknown stars |
-| `price_max` | int | no | `250000` | Rubles |
-| `hotel_name` | string | no | `Rixos` | Case-insensitive substring search |
-| `beach_line` | int | no | `1` | `1` means first line |
-| `limit` | int | no | `20` | 1..100, default 20 |
-| `sort` | enum | no | `price` | `price`, `cashback`, or `check_in` |
+All endpoints are GET and return JSON. Results come from live async search.
 
-Do not send `adults`, `kids`, `infants`, or other family-composition params. If
-the request needs those, use Travelata instead.
+## Search Flow
 
-## Response Shape
+Mirror the Travelata two-step pattern with Level.Travel's own endpoint names:
+
+1. **Start async search** with `GET /search/enqueue` — returns `request_id` and a per-operator `status` map.
+2. **Wait** before fetching results:
+   - Close destinations (Turkey, Egypt, UAE, Cyprus, Greece): ~7 seconds
+   - Far destinations (Vietnam, Thailand, Indonesia/Bali, Cuba, Dominican Republic, Maldives, Mexico): ~10 seconds
+   - When running Travelata and Level.Travel together, wait the **longer** of the two recommended waits for that destination, then fetch both.
+3. **Fetch hotels** with `GET /search/get_grouped_hotels?request_id=...&limit=10..20`.
+4. **If fewer than ~5 hotels came back** and operators still look unfinished (`performing` in the enqueue `status` map, or after an optional `search/status` check), wait another 3–5 seconds and re-call `get_grouped_hotels` with the **same** `request_id`. No new enqueue.
+
+Do **not** make `GET /search/status` a mandatory step. It is optional, for edge-case debugging only — it costs an extra call and does not return hotel data. Soft-polling via a second `get_grouped_hotels` is enough in the normal flow.
+
+### Step 1 — enqueue search
+
+```bash
+python scripts/api_call.py --method GET \
+  --url "https://api.botclaw.ru/leveltravel/search/enqueue" \
+  --params '{"from_city":"Moscow","to_country":"TR","adults":"2","start_date":"28.07.2026","nights":"7..9","kids":"0"}'
+```
+
+Typical response:
 
 ```json
 {
-  "source": "leveltravel",
-  "feed_synced_at": "2026-04-13T16:40:00Z",
-  "feed_age_hours": 3,
-  "total_matched": 127,
-  "returned": 20,
-  "note": "Level.Travel prices come from a cached snapshot; meal info is not available.",
-  "results": [
-    {
-      "hotel": { "name": "Malibu Garden Resort", "stars": 3 },
-      "location": { "country_iso2": "TR", "country_ru": "Турция", "region_ru": "Кемер" },
-      "departure": { "key": "moscow", "city_ru": "Москва" },
-      "tour": {
-        "check_in": "2026-05-16",
-        "nights": 8,
-        "price_rub": 250524,
-        "cashback_rub": 5010,
-        "operator": "Level.Travel"
-      },
-      "features": {
-        "beach_type": "PUBLIC",
-        "beach_surface": "PEBBLE",
-        "beach_line": 1,
-        "airport_distance_m": 56000,
-        "ski_lift_distance_m": null,
-        "has_wifi": true,
-        "has_parking": true
-      },
-      "hotel_url": "https://level.travel/hotels/9206953-Malibu_Garden_Resort?..."
-    }
-  ]
+  "success": true,
+  "request_id": "abc123...",
+  "status": {
+    "12": "pending",
+    "34": "pending"
+  }
 }
 ```
 
-If `feed_age_hours` is greater than 12, say explicitly that the Level.Travel
-snapshot is stale. If `total_matched` is much larger than `returned`, tell the
-user you showed the best subset and can expand it.
-
-## Parallel Call Pattern
-
-Start the Travelata async search and the Level.Travel query at the same time.
-Level.Travel returns quickly; Travelata needs its usual wait before `GET /tours`.
+### Step 2 — fetch grouped hotels
 
 ```bash
-python scripts/api_call.py --method POST \
-  --url "https://api.botclaw.ru/travelata-partners/tours/asyncSearch" \
-  --body '{"departureCity":2,"country":92,"checkInDateRange":{"from":"2026-05-01","to":"2026-05-15"},"nightRange":{"from":"7","to":"10"},"touristGroup":{"adults":2,"kids":0,"infants":0}}'
-
 python scripts/api_call.py --method GET \
-  --url "https://api.botclaw.ru/leveltravel/tours" \
-  --params '{"departure_key":"moscow","country_iso2":"TR","date_from":"2026-05-01","date_to":"2026-05-15","nights_min":"7","nights_max":"10","stars_min":"4","limit":"20"}'
+  --url "https://api.botclaw.ru/leveltravel/search/get_grouped_hotels" \
+  --params '{"request_id":"<request_id>","limit":"15"}'
 ```
 
-Merge both result sets in the final answer and label the source of each tour.
-If the query falls outside Level.Travel scope, do not make the second call.
+Always pass `limit=10..20` to keep responses small (API default is 30, max 100).
 
-## URL Shortening
+## Enqueue Parameters (`GET /search/enqueue`)
 
-Every `hotel_url` from Level.Travel must go through `/short-link` before you show
-it to the user.
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `from_city` | string | yes | Departure city `name_en` (e.g. `Moscow`). See departures table / `references/departures` |
+| `to_country` | string | yes | Destination country ISO2 (e.g. `TR`). From `references/destinations` |
+| `adults` | int | yes | Number of adults |
+| `start_date` | string | yes* | Check-in date in **DD.MM.YYYY** (e.g. `28.07.2026`) — not ISO |
+| `nights` | string | yes* | Night range, e.g. `7..9` |
+| `flex_dates` | int | no | ± days around `start_date` |
+| `start_date_from` / `start_date_till` / `end_date_from` / `end_date_till` | string | no | Alternative to `start_date` + `flex_dates`: date-interval bounds |
+| `to_city` | string | no | Destination city `name_en` — narrows within the country |
+| `kids` | int | no | Number of children. Default 0 |
+| `kids_ages[]` | int array | **required when kids > 0** | One age per child; repeated query param |
+| `hotel_ids[]` | int/string array | no | Search specific hotels only |
+| `search_type` | string | no | `package` (default, flight+hotel) or `hotel` (hotel only, no flight) |
+
+\* Use either `start_date` + `nights` (optionally with `flex_dates`) **or** the date-interval params. Prefer `start_date` + `nights` for normal queries.
+
+### Kids handling
+
+Whenever `kids > 0`, always pass `kids_ages[]` with one age per child:
+
+```json
+{
+  "from_city": "Moscow",
+  "to_country": "TR",
+  "adults": "2",
+  "kids": "2",
+  "kids_ages[]": ["8", "5"],
+  "start_date": "28.07.2026",
+  "nights": "7..9"
+}
+```
+
+`api_call.py` uses `doseq=True` for GET, so bracketed array keys work as repeated params.
+
+### Date format warning (common bug)
+
+| Context | `start_date` format |
+|---------|---------------------|
+| **Enqueue API** (`search/enqueue`) | **DD.MM.YYYY** — e.g. `28.07.2026` |
+| **Site link** (`https://level.travel/hotels/...?start_date=...`) | **YYYY-MM-DD** — e.g. `2026-07-28` |
+
+These formats are different on purpose. Converting incorrectly is a frequent source of broken links or failed searches. Always reformat when moving between the API and the booking URL.
+
+There is **no meal-plan / pansion parameter** on enqueue. Filter meal type client-side from each hotel's `pansion_prices` keys in the results (see below).
+
+## Results Parameters (`GET /search/get_grouped_hotels`)
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `request_id` | string | yes | From enqueue response |
+| `limit` | int | no | Max hotels returned. **Pass 10–20.** Default 30, max 100 |
+| `filter_price_min` | int | no | Minimum price (RUB) |
+| `filter_price_max` | int | no | Maximum price (RUB) |
+| `filter_stars` | string | no | Comma list of star ratings, e.g. `5,4` |
+| `filter_rating` | number | no | Minimum hotel rating (0–10 scale) |
+| `filter_hotel_name` | string | no | Hotel name substring |
+| `filter_regions` | string | no | Region filter |
+
+Additional filter params may exist beyond this list; the common ones above cover most agent needs.
+
+## Response Shape (`get_grouped_hotels`)
+
+```json
+{
+  "success": true,
+  "status": {},
+  "hotels": [
+    {
+      "hotel": {
+        "id": 9136093,
+        "name": "Seyithan Palace Spa Hotel",
+        "stars": 5,
+        "rating": 8.7,
+        "reviews_count": 342,
+        "link": "/hotels/9136093-Seyithan_Palace_Spa_Hotel",
+        "region_name": "Kemer",
+        "city": "Kemer",
+        "images": ["..."],
+        "features": {}
+      },
+      "min_price": 187000,
+      "min_price_nights": 7,
+      "dates": {"2026-07-28": 187000},
+      "pansion_prices": {"RO": 187000, "AI": 210000},
+      "operators": [12, 34],
+      "tour_id": "...",
+      "availability": "...",
+      "cancellation_policy": "..."
+    }
+  ],
+  "hotels_count": 42,
+  "currency_code": "RUB",
+  "currency_symbol": "₽",
+  "sort_by": "price",
+  "search_type": "package"
+}
+```
+
+Field notes:
+
+- `hotels_count` — total matched hotels **before** truncation by `limit`.
+- `hotel.link` — **relative** path starting with `/hotels/...`. Prefix with `https://level.travel` before use.
+- `hotel.rating` — 0–10 scale (not stars, not 0–5).
+- `pansion_prices` — keys are board codes: `RO` (room only), `BB` (bed & breakfast), `HB` (half board), `FB` (full board), `AI` (all inclusive), `UAI` (ultra all inclusive), etc. Pick the cheapest offer at the desired board level client-side.
+- `min_price` / `dates` — useful for the cheapest date/price point without opening room details.
+
+## Optional Deep-Dive Endpoints
+
+### Room-level offers — `GET /search/hotel_rooms`
+
+```bash
+python scripts/api_call.py --method GET \
+  --url "https://api.botclaw.ru/leveltravel/search/hotel_rooms" \
+  --params '{"request_id":"<request_id>","hotel_id":"9136093"}'
+```
+
+Optional step when the user wants room details for one hotel (similar spirit to Travelata's per-tour actualization). Not part of the default list flow.
+
+### Package details — `GET /packages/package_details`
+
+Optional deeper look at one specific offer before presenting it as the final recommendation. Expect `request_id` (and likely offer identifiers) among the params. Exact param set is not fully listed here — if you need this step, confirm params with a trial GET rather than inventing a table. Use only when the user is narrowing to a final pick, not for every hotel in a shortlist.
+
+### Status — `GET /search/status`
+
+```bash
+python scripts/api_call.py --method GET \
+  --url "https://api.botclaw.ru/leveltravel/search/status" \
+  --params '{"request_id":"<request_id>"}'
+```
+
+Per-operator status values include: `pending`, `performing`, `completed`, `no_results`, `failed`, `skipped`. Optional / debugging only.
+
+## Reference Lookups
+
+All GET, no async wait needed.
+
+| Endpoint | Purpose | Params |
+|----------|---------|--------|
+| `GET /references/departures` | Valid departure cities | none |
+| `GET /references/destinations` | Countries + cities | none |
+| `GET /references/hotels` | Hotel info lookup | **`hotel_ids` OR `region_ids`** (at least one required; HTTP 400 if neither) |
+
+- Departures: each item has `name_ru`, `name_en`, `iata`. Use **`name_en`** as `from_city` in enqueue.
+- Destinations: each item has `name_ru`, `name_en`, `iso2`. Use **`iso2`** as `to_country`, **`name_en`** as `to_city`.
+
+### Common departure cities (`from_city`)
+
+| name_ru | name_en (`from_city`) |
+|---------|------------------------|
+| Москва | Moscow |
+| Санкт-Петербург | Saint Petersburg |
+| Екатеринбург | Ekaterinburg |
+| Казань | Kazan |
+| Новосибирск | Novosibirsk |
+| Самара | Samara |
+| Уфа | Ufa |
+| Краснодар | Krasnodar |
+| Ростов-на-Дону | Rostov-on-Don |
+| Нижний Новгород | Nizhny Novgorod |
+| Челябинск | Chelyabinsk |
+| Пермь | Perm |
+| Красноярск | Krasnoyarsk |
+| Тюмень | Tyumen |
+| Минеральные Воды | Mineralnye Vody |
+
+For the full list or any city not in this table, call `GET /references/departures`.
+
+## Booking Links
+
+Build the user-facing hotel link from `hotel.link` (relative path) and query params:
+
+```text
+https://level.travel{hotel.link}?start_date=YYYY-MM-DD&nights=N&adults=N
+```
+
+Example:
+
+```text
+https://level.travel/hotels/9136093-Seyithan_Palace_Spa_Hotel?start_date=2026-07-28&nights=7&adults=2
+```
+
+**Remember:** site `start_date` is **YYYY-MM-DD**; enqueue used **DD.MM.YYYY**.
+
+Shorten every such link via the link-shortening service before showing it:
 
 ```bash
 python scripts/api_call.py --method GET \
   --url "https://api.botclaw.ru/short-link" \
-  --params '{"url":"https://level.travel/hotels/9206953-Malibu_Garden_Resort?..."}'
+  --params '{"url":"https://level.travel/hotels/9136093-Seyithan_Palace_Spa_Hotel?start_date=2026-07-28&nights=7&adults=2"}'
 ```
 
-## Departure Keys
+## Search Strategy
 
-See `assets/leveltravel-departure-cities.json` for the full list of supported
-departure keys. The file currently contains 63 entries aligned with the current
-`leveltravel_feed.FEEDS` list.
+- On **any** tour request, start Level.Travel enqueue **and** Travelata `asyncSearch` in the same step. Wait once (use the longer wait if they differ), then fetch both result sets and merge. Label which source each hotel/tour came from.
+- Prefer `start_date` + `nights` (e.g. `7..9`) over a single fixed night count.
+- Use `flex_dates` or date-interval params when the user is flexible on dates.
+- Kids are fully supported: pass `kids` + `kids_ages[]` whenever kids > 0.
+- Any night count and any date horizon are valid — no hard 7–15 / near-term limits.
+- `search_type=package` (default) for flight+hotel; `search_type=hotel` for hotel only.
+- Meal/board filtering is client-side via `pansion_prices` keys (`AI`, `UAI`, etc.). There is no meal param on enqueue.
+- Pass `limit=10..20` on `get_grouped_hotels`. If `hotels_count` is much larger than returned, say you showed the best subset and can expand.
+- If the first fetch is thin (< ~5 hotels) and operators may still be working, wait 3–5 s and re-fetch with the same `request_id` before relaxing criteria.
+- Sort and group client-side; present the cheapest strong hotels, not a raw dump.
 
-`ski` is a special slice, not a city. It contains Russian ski-resort offers from
-many departure cities. For a query like "горнолыжка из Москвы", use
-`departure_key=ski&departure_city=Москва`.
+## Error Handling
+
+HTTP **400** responses include an `error` field describing what is wrong (e.g. missing required param). Fix the params and retry. Do not invent params that are not in this doc for enqueue / get_grouped_hotels; for `package_details`, confirm via a trial GET if needed.
+
+## Presentation Notes
+
+- Show hotel name, stars, region/city, rating (0–10), meal/board chosen from `pansion_prices`, check-in, nights, price, source label (`Level.Travel`), and short booking link.
+- Prefer 5–8 hotels in the shortlist; group by hotel when comparing dates or board options.
+- When merging with Travelata, keep source labels clear so the user can tell which site each offer opens.
