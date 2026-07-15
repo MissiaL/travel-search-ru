@@ -31,7 +31,7 @@ Do not let a cheaper but worse-fit option outrank a clearly better match.
 
 ## Compact Output Format
 
-For tours, keep each option short and calm. Prefer sections over decorative markers:
+For tours, keep each option short and calm. Prefer sections over decorative symbols:
 
 ```text
 Best options in Kemer
