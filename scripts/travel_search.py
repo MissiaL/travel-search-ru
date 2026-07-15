@@ -29,7 +29,7 @@ COMMAND_TO_TOOL = {
 }
 
 _PROTOCOL_VERSION = "2024-11-05"
-_CLIENT_INFO = {"name": "travel-search-ru", "version": "2.0.1"}
+_CLIENT_INFO = {"name": "travel-search-ru", "version": "2.0.2"}
 
 
 class McpError(RuntimeError):
@@ -106,7 +106,7 @@ class McpClient(object):
         req = urllib.request.Request(self.endpoint, data=data, method="POST")
         req.add_header("Content-Type", "application/json")
         req.add_header("Accept", "application/json, text/event-stream")
-        req.add_header("User-Agent", "travel-search-ru/2.0.1")
+        req.add_header("User-Agent", "travel-search-ru/2.0.2")
         if self._session_id:
             req.add_header("Mcp-Session-Id", self._session_id)
         if self._protocol_version:

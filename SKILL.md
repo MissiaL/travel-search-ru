@@ -4,8 +4,9 @@ description: Use when the user explicitly asks to search or compare current trav
 compatibility: Requires Python 3.8+ and outbound HTTPS access to https://mcp.botclaw.ru/travel. Search criteria are sent to this read-only service; it does not book.
 metadata:
   author: MissiaL
-  version: "2.0.1"
+  version: "2.0.2"
   keywords: "travel,flights,tours,hotels,excursions,mcp,russia,turkey,egypt,booking"
+  permissions: "outbound HTTPS only to https://mcp.botclaw.ru/travel; execute bundled scripts/travel_search.py"
 ---
 
 # Travel Search

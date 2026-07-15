@@ -1,5 +1,7 @@
 # Travel Search CLI usage
 
+**Privacy:** Every command sends the supplied JSON search criteria to the live external production service. Criteria may contain itinerary/location, dates, traveler counts/ages, budget, and preferences. Do not include names, contacts, passport/payment details, credentials, or unnecessary sensitive data. The local skill does not persist requests, but no server-side retention guarantee is declared, so treat it as an external service.
+
 The skill talks only to the production MCP endpoint over Streamable HTTP. There is no public `--url` flag and no environment-based endpoint override.
 
 ## Commands

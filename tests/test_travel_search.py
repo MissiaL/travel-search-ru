@@ -928,7 +928,7 @@ class TravelSearchTests(unittest.TestCase):
     def test_version_synchronization(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(pkg["version"], "2.0.1")
+        self.assertEqual(pkg["version"], "2.0.2")
         data, _ = self._skill_frontmatter()
         meta = data.get("metadata")
         # Agent Skills: metadata must be a YAML mapping of string values
@@ -937,7 +937,7 @@ class TravelSearchTests(unittest.TestCase):
             meta, dict, msg="metadata must be a YAML block mapping"
         )
         self.assertEqual(meta.get("author"), "MissiaL")
-        self.assertEqual(str(meta.get("version")), "2.0.1")
+        self.assertEqual(str(meta.get("version")), "2.0.2")
         self.assertIsInstance(
             meta.get("version"),
             str,
@@ -968,9 +968,10 @@ class TravelSearchTests(unittest.TestCase):
             msg="metadata must not use inline JSON-style object syntax",
         )
         # CLI client info / User-Agent stay synchronized with the release
-        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.0.1")
+        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.0.2")
         src = (ROOT / "scripts" / "travel_search.py").read_text(encoding="utf-8")
-        self.assertIn('User-Agent", "travel-search-ru/2.0.1"', src)
+        self.assertIn('User-Agent", "travel-search-ru/2.0.2"', src)
+        self.assertNotIn("2.0.1", pkg["version"])
         self.assertNotIn("2.0.0", pkg["version"])
 
     def test_skill_md_line_limit(self):
@@ -1332,13 +1333,13 @@ class TravelSearchTests(unittest.TestCase):
         )
 
     def test_skill_compatibility_declares_network_not_permissions(self):
-        """Agent Skills standard compatibility field; no invented permissions."""
+        """Agent Skills standard compatibility field; no invented root permissions."""
         data, skill = self._skill_frontmatter()
-        # Non-standard permissions frontmatter must not appear
+        # Non-standard root permissions frontmatter must not appear
         self.assertNotRegex(
             skill,
             r"(?m)^permissions\s*:",
-            msg="must not invent non-standard permissions frontmatter",
+            msg="must not invent non-standard root permissions frontmatter",
         )
         compat = data.get("compatibility")
         self.assertIsNotNone(compat, msg="compatibility frontmatter required")
@@ -1356,6 +1357,131 @@ class TravelSearchTests(unittest.TestCase):
             compat,
             r"search criteria|criteria are sent|критерии",
             msg="compatibility must note search criteria are sent to the service",
+        )
+
+    def test_metadata_permissions_machine_readable(self):
+        """LP3: portable metadata.permissions string; no root permissions field."""
+        data, skill = self._skill_frontmatter()
+        self.assertNotRegex(
+            skill,
+            r"(?m)^permissions\s*:",
+            msg="must not invent unsupported root permissions field",
+        )
+        meta = data.get("metadata")
+        self.assertIsInstance(meta, dict, msg="metadata must be a mapping")
+        perms = meta.get("permissions")
+        self.assertIsInstance(
+            perms,
+            str,
+            msg="metadata.permissions must be a string (Agent Skills metadata values)",
+        )
+        self.assertTrue(perms.strip(), msg="metadata.permissions must be non-empty")
+        # Explicit limited capability: one HTTPS endpoint + bundled script
+        self.assertIn("https://mcp.botclaw.ru/travel", perms)
+        self.assertRegex(
+            perms,
+            r"(?i)outbound|HTTPS",
+            msg="permissions must declare outbound HTTPS-only network access",
+        )
+        self.assertIn("scripts/travel_search.py", perms)
+        self.assertRegex(
+            perms,
+            r"(?i)execute|run|script",
+            msg="permissions must declare execution of bundled travel_search.py",
+        )
+        # No wildcards or broad grants
+        self.assertNotIn("*", perms)
+        lower = perms.lower()
+        for banned in (
+            "filesystem",
+            "credential",
+            "email",
+            "calendar",
+            "booking",
+            "persist",
+            "http://",
+        ):
+            self.assertNotIn(
+                banned,
+                lower if banned != "http://" else perms,
+                msg="permissions must not grant {0}".format(banned),
+            )
+
+    def test_usage_privacy_disclosure_and_unknown_retention(self):
+        """SQP-2: usage.md privacy notice — criteria sent; no retention guarantee."""
+        usage = (ROOT / "references" / "usage.md").read_text(encoding="utf-8")
+        # Notice must appear near the top of the document
+        head = "\n".join(usage.splitlines()[:25])
+        self.assertRegex(
+            head,
+            r"(?i)privacy|sensitive|search criteria|JSON",
+            msg="privacy notice must appear at the top of usage.md",
+        )
+        # Every command sends supplied JSON criteria to live external production
+        self.assertRegex(
+            usage,
+            r"(?i)every\s+command|each\s+command",
+            msg="usage must state every command transmits data",
+        )
+        self.assertRegex(
+            usage,
+            r"(?i)JSON|search criteria",
+            msg="usage must identify transmitted search criteria / JSON",
+        )
+        self.assertRegex(
+            usage,
+            r"(?i)live|production|external",
+            msg="usage must name the live external production service",
+        )
+        # Criteria may contain itinerary/location, dates, travelers, budget, prefs
+        self.assertRegex(
+            usage,
+            r"(?i)itinerary|location",
+            msg="usage must list itinerary/location as possible criteria",
+        )
+        self.assertRegex(usage, r"(?i)\bdates?\b", msg="usage must mention dates")
+        self.assertRegex(
+            usage,
+            r"(?i)traveler|adults|ages",
+            msg="usage must mention traveler counts/ages",
+        )
+        self.assertRegex(usage, r"(?i)budget", msg="usage must mention budget")
+        self.assertRegex(
+            usage,
+            r"(?i)preference",
+            msg="usage must mention preferences",
+        )
+        # Do not send PII / payment / credentials
+        self.assertRegex(
+            usage,
+            r"(?i)names?|contacts?",
+            msg="usage must warn against names/contacts",
+        )
+        self.assertRegex(
+            usage,
+            r"(?i)passport|payment",
+            msg="usage must warn against passport/payment details",
+        )
+        self.assertRegex(
+            usage,
+            r"(?i)credential",
+            msg="usage must warn against credentials",
+        )
+        # Local skill does not persist; server retention not guaranteed
+        self.assertRegex(
+            usage,
+            r"(?i)does not persist|not persist|no\s+local\s+persist",
+            msg="usage must state the local skill does not persist requests",
+        )
+        self.assertRegex(
+            usage,
+            r"(?i)retention|no\s+.*guarantee|not\s+declar",
+            msg="usage must address unknown/undeclared server-side retention",
+        )
+        self.assertRegex(
+            usage,
+            r"(?i)external\s+service|treat\s+it\s+as\s+an\s+external",
+            msg="usage must advise treating the endpoint as an external service",
         )
 
     def test_skill_body_russian_catalog_language_rule(self):
