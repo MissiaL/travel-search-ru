@@ -47,23 +47,12 @@ Common Turkey resort IDs:
 - Сиде: 3828
 - Аланья: 2159
 
-## Hotels (search by name)
+## Hotels
 
-```bash
-python scripts/api_call.py --method GET \
-  --url "https://api.botclaw.ru/travelata-partners/directory/destinations" \
-  --params '{"term":"Maxx Royal Belek"}'
-```
-
-Returns countries, resorts, and hotels matching the search term. Each result has `type` (`country`/`resort`/`hotel`), `id`, `name`. Use the hotel `id` as `hotels[]` in search.
-
-For full hotel details:
-
-```bash
-python scripts/api_call.py --method GET \
-  --url "https://api.botclaw.ru/travelata-partners/directory/hotels" \
-  --params '{"id[]":["47624"]}'
-```
+The public API does not expose standalone hotel search or hotel directory routes.
+Hotel names and IDs arrive in `GET /tours` when you pass `sections[]=hotels`.
+If the user names a hotel but its ID is unknown, search the requested country/resort,
+match the name in that `hotels` section, and then repeat the search with `hotels[]`.
 
 ## Departure Cities
 
@@ -97,9 +86,5 @@ Each item: `{"id": 1, "code": "AI", "name": "Всё включено"}`. Use `id
 
 ## Operators
 
-```bash
-python scripts/api_call.py --method GET \
-  --url "https://api.botclaw.ru/travelata-partners/directory/operators"
-```
-
-Each item: `{"id": ..., "name": "..."}`. Use `id` as `operators[]` in search.
+There is no standalone operator directory route in the public API. Request
+`sections[]=operators` with `GET /tours` to resolve operator IDs returned by search.

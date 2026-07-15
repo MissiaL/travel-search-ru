@@ -111,7 +111,9 @@ def make_request(method, url, params=None, body=None, headers=None):
 
 def main():
     parser = argparse.ArgumentParser(description="HTTP client for travel APIs")
-    parser.add_argument("--method", default="GET", choices=["GET", "POST"], help="HTTP method")
+    parser.add_argument(
+        "--method", default="GET", choices=["GET", "POST", "PATCH"], help="HTTP method"
+    )
     parser.add_argument("--url", required=True, help="Request URL")
     parser.add_argument("--params", default=None, help="Query params as JSON object (for GET)")
     parser.add_argument("--body", default=None, help="Request body as JSON (for POST)")

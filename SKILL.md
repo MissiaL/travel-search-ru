@@ -15,6 +15,7 @@ Run the HTTP client to call APIs:
 ```bash
 python scripts/api_call.py --method GET --url "<URL>" --params '<JSON>'
 python scripts/api_call.py --method POST --url "<URL>" --body '<JSON>'
+python scripts/api_call.py --method PATCH --url "<URL>"
 ```
 
 `--params`, `--body`, and `--headers` must be valid JSON objects. Do not pass query strings like `a=1&b=2`.

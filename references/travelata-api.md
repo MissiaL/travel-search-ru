@@ -6,9 +6,7 @@ Package tours: flight + hotel. Real-time search via the Travelata live tour API.
 
 ```text
 POST  https://api.botclaw.ru/travelata-partners/tours/asyncSearch
-GET   https://api.botclaw.ru/travelata-partners/tours/asyncSearch/{id}
 GET   https://api.botclaw.ru/travelata-partners/tours
-GET   https://api.botclaw.ru/travelata-partners/tours/{tourId}
 PATCH https://api.botclaw.ru/travelata-partners/tours/{tourId}
 ```
 
@@ -26,7 +24,9 @@ Results are live, not cached. Supports many tours per date, filtering by specifi
 
 Only after a second fetch returns the same low/empty result should you start relaxing filters — see "Search Strategy" below.
 
-Do not use the dedicated `GET /tours/asyncSearch/{id}` polling endpoint in normal flow — it eats rate limit without giving you the tours, and a re-fetch of `GET /tours` already does the job.
+The public API does not expose the dedicated `GET /tours/asyncSearch/{id}` polling
+endpoint: it does not return tours and would only consume the upstream rate limit.
+Re-fetch `GET /tours` instead.
 
 ### Step 1 — start search
 
