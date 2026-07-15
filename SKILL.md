@@ -1,7 +1,11 @@
 ---
 name: travel-search-ru
-description: Search package tours, hotels, flights, and activities via the travel MCP endpoint with real prices and booking links. Use when the user asks about travel, flights, airfare, hotels, tours, excursions, vacations, or trip planning.
-metadata: {"author":"MissiaL","version":"2.0.0","keywords":["travel","flights","tours","hotels","excursions","mcp","russia","turkey","egypt","booking"]}
+description: Use when the user explicitly asks to search or compare current travel inventory, prices, availability, or booking links through this travel MCP (package tours, hotels, flights, or activities). Do not use for general travel advice, itinerary brainstorming, or non-search discussion. Optimized for Russian-language requests and a Russian-language catalog.
+compatibility: Requires Python 3.8+ and outbound HTTPS access to https://mcp.botclaw.ru/travel. Search criteria are sent to this read-only service; it does not book.
+metadata:
+  author: MissiaL
+  version: "2.0.1"
+  keywords: "travel,flights,tours,hotels,excursions,mcp,russia,turkey,egypt,booking"
 ---
 
 # Travel Search
@@ -70,6 +74,7 @@ If children are in the party and ages are unknown, **ask for ages** before prese
 
 ## Rules
 
+- Russian catalog values/examples are intentional: the upstream directory uses Russian names. Preserve the user's answer language where possible; do not force Russian conversation. Use Russian catalog values for MCP calls when required.
 - **Hotel-only** requests use `search-hotels`, not package `search-tours`.
 - **Fresh details** for a chosen tour use `get-tour-details`; do not reuse stale offer payloads as live quotes.
 - Prefer **short booking URLs** from the response. If a short URL is missing, **never** fall back to a raw/long provider URL.

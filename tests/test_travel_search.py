@@ -928,16 +928,54 @@ class TravelSearchTests(unittest.TestCase):
     def test_version_synchronization(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(pkg["version"], "2.0.0")
-        self.assertIn('"version":"2.0.0"', skill.replace(" ", ""))
-        # metadata version
-        m = re.search(r'"version"\s*:\s*"([^"]+)"', skill)
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1), "2.0.0")
+        self.assertEqual(pkg["version"], "2.0.1")
+        data, _ = self._skill_frontmatter()
+        meta = data.get("metadata")
+        # Agent Skills: metadata must be a YAML mapping of string values
+        # (not inline JSON-style object; keywords not a YAML/JSON list).
+        self.assertIsInstance(
+            meta, dict, msg="metadata must be a YAML block mapping"
+        )
+        self.assertEqual(meta.get("author"), "MissiaL")
+        self.assertEqual(str(meta.get("version")), "2.0.1")
+        self.assertIsInstance(
+            meta.get("version"),
+            str,
+            msg="metadata.version must be a string",
+        )
+        keywords = meta.get("keywords")
+        self.assertIsInstance(
+            keywords,
+            str,
+            msg="metadata.keywords must be one comma-separated string, not a list",
+        )
+        for kw in (
+            "travel",
+            "flights",
+            "tours",
+            "hotels",
+            "excursions",
+            "mcp",
+            "russia",
+            "turkey",
+            "egypt",
+            "booking",
+        ):
+            self.assertIn(kw, keywords)
+        self.assertNotRegex(
+            skill,
+            r"(?m)^metadata\s*:\s*\{",
+            msg="metadata must not use inline JSON-style object syntax",
+        )
+        # CLI client info / User-Agent stay synchronized with the release
+        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.0.1")
+        src = (ROOT / "scripts" / "travel_search.py").read_text(encoding="utf-8")
+        self.assertIn('User-Agent", "travel-search-ru/2.0.1"', src)
+        self.assertNotIn("2.0.0", pkg["version"])
 
     def test_skill_md_line_limit(self):
         lines = (ROOT / "SKILL.md").read_text(encoding="utf-8").splitlines()
-        self.assertLessEqual(len(lines), 140)
+        self.assertLessEqual(len(lines), 95)
 
     def test_skill_links_only_usage(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -1193,6 +1231,198 @@ class TravelSearchTests(unittest.TestCase):
         # Expected Russian section markers (natural headings)
         for heading in ("Установка", "Требования", "Лицензия"):
             self.assertIn(heading, readme)
+
+    # --- 2.0.1 docs: narrow trigger, RU catalog, compatibility, README disclosure ---
+
+    def _skill_frontmatter(self):
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        match = re.match(r"^---\n(.*?)\n---", skill, re.DOTALL)
+        self.assertIsNotNone(match, msg="SKILL.md frontmatter missing")
+        try:
+            import yaml  # optional; fall back to line parse if unavailable
+        except ImportError:
+            yaml = None
+        if yaml is not None:
+            data = yaml.safe_load(match.group(1))
+            self.assertIsInstance(data, dict)
+            return data, skill
+        # Minimal fallback without PyYAML: flat keys + one-level block mappings
+        fm = match.group(1)
+        data = {}
+        current_map = None  # type: Optional[str]
+        for line in fm.splitlines():
+            if not line.strip():
+                continue
+            if line[:1] in (" ", "\t") and current_map is not None and ":" in line:
+                key, val = line.strip().split(":", 1)
+                nested = data.get(current_map)
+                if not isinstance(nested, dict):
+                    nested = {}
+                    data[current_map] = nested
+                nested[key.strip()] = val.strip().strip("\"'")
+                continue
+            if ":" not in line:
+                continue
+            key, val = line.split(":", 1)
+            key = key.strip()
+            val = val.strip()
+            if val == "":
+                data[key] = {}
+                current_map = key
+            else:
+                current_map = None
+                data[key] = val.strip("\"'")
+        return data, skill
+
+    def test_skill_description_narrow_trigger_and_russian_scope(self):
+        """Frontmatter description must be narrowly triggered and RU-scoped."""
+        data, skill = self._skill_frontmatter()
+        desc = data.get("description") or ""
+        if not isinstance(desc, str):
+            desc = str(desc)
+        desc = desc.strip()
+        self.assertTrue(
+            desc.startswith("Use when"),
+            msg="description must start with 'Use when'",
+        )
+        # Third-person narrow inventory/search trigger (not generic trip chat)
+        self.assertRegex(
+            desc,
+            r"search or compare|search(?:es)?|compare",
+            msg="description must require explicit search/compare intent",
+        )
+        self.assertRegex(
+            desc,
+            r"inventory|prices|availability|booking links",
+            msg="description must target current inventory/prices/availability/links",
+        )
+        # Explicit exclusions for broad travel chat
+        self.assertRegex(
+            desc,
+            r"general travel advice",
+            msg="description must exclude general travel advice",
+        )
+        self.assertRegex(
+            desc,
+            r"itinerary brainstorming",
+            msg="description must exclude itinerary brainstorming",
+        )
+        self.assertRegex(
+            desc,
+            r"non-search",
+            msg="description must exclude non-search discussion",
+        )
+        # Must not keep the v2.0.0 broad trigger phrasing
+        self.assertNotRegex(
+            desc,
+            r"asks about travel,\s*flights,\s*airfare",
+            msg="broad travel/trip-planning trigger must be removed",
+        )
+        self.assertNotIn("trip planning", desc.lower())
+        # Russian-language / catalog scope
+        self.assertRegex(
+            desc,
+            r"Russian-language",
+            msg="description must state Russian-language optimization",
+        )
+        self.assertRegex(
+            desc,
+            r"Russian-language catalog|Russian catalog",
+            msg="description must state Russian-language catalog scope",
+        )
+
+    def test_skill_compatibility_declares_network_not_permissions(self):
+        """Agent Skills standard compatibility field; no invented permissions."""
+        data, skill = self._skill_frontmatter()
+        # Non-standard permissions frontmatter must not appear
+        self.assertNotRegex(
+            skill,
+            r"(?m)^permissions\s*:",
+            msg="must not invent non-standard permissions frontmatter",
+        )
+        compat = data.get("compatibility")
+        self.assertIsNotNone(compat, msg="compatibility frontmatter required")
+        if not isinstance(compat, str):
+            compat = str(compat)
+        self.assertRegex(compat, r"Python 3\.8\+")
+        self.assertIn("https://mcp.botclaw.ru/travel", compat)
+        self.assertRegex(compat, r"HTTPS|https://")
+        self.assertRegex(
+            compat,
+            r"read-only|does not book|не бронир",
+            msg="compatibility must note read-only / no booking",
+        )
+        self.assertRegex(
+            compat,
+            r"search criteria|criteria are sent|критерии",
+            msg="compatibility must note search criteria are sent to the service",
+        )
+
+    def test_skill_body_russian_catalog_language_rule(self):
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        body = re.split(r"^---\s*$", skill, maxsplit=2, flags=re.M)
+        body_text = body[-1] if body else skill
+        self.assertRegex(
+            body_text,
+            r"Russian catalog|русск\w+\s+каталог|upstream directory uses Russian",
+            msg="SKILL body must justify Russian catalog values/examples",
+        )
+        self.assertRegex(
+            body_text,
+            r"preserve the user.?s answer language|do not force Russian|язык ответа|не навязыва",
+            msg="SKILL body must preserve user language; not force Russian conversation",
+        )
+        self.assertRegex(
+            body_text,
+            r"Russian catalog values for MCP|русск\w+ значени\w+ каталог",
+            msg="SKILL body must use Russian catalog values for MCP when required",
+        )
+
+    def test_readme_locale_behavior_and_remote_data_disclosure(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        # Intended Russian-language / catalog scope
+        self.assertRegex(
+            readme,
+            r"русскоязычн\w+|русск\w+\s+каталог|русск\w+\s+запрос",
+            msg="README must explain Russian-language/catalog scope",
+        )
+        # Non-Russian request behavior
+        self.assertRegex(
+            readme,
+            r"не на русском|на языке пользователя|язык ответа",
+            msg="README must explain behavior for non-Russian requests",
+        )
+        # Exact remote endpoint
+        self.assertIn("https://mcp.botclaw.ru/travel", readme)
+        # Only search criteria sent; no credentials / email / calendar / booking / persistence
+        self.assertRegex(
+            readme,
+            r"критерии поиска|переданн\w+ критери",
+            msg="README must state only search criteria are sent",
+        )
+        self.assertRegex(
+            readme,
+            re.compile(
+                r"учётн\w+\s+данн|учетн\w+\s+данн|credentials|парол",
+                re.IGNORECASE,
+            ),
+            msg="README must state credentials are not sent",
+        )
+        self.assertRegex(
+            readme,
+            r"почт|calendar|календар",
+            msg="README must state email/calendar are not accessed",
+        )
+        self.assertRegex(
+            readme,
+            r"бронирован|не бронир",
+            msg="README must state no booking",
+        )
+        self.assertRegex(
+            readme,
+            r"хранен|persist|долговремен",
+            msg="README must state no persistence",
+        )
 
     # --- review fixes: package whitelist, SSE deadline, protocol version ---
 
