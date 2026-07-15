@@ -94,7 +94,8 @@ def make_request(method, url, params=None, body=None, headers=None):
             for k, v in headers.items():
                 req.add_header(k, v)
 
-        resp = urllib.request.urlopen(req, context=ctx, timeout=30)
+        timeout = 70 if method == "PATCH" else 30
+        resp = urllib.request.urlopen(req, context=ctx, timeout=timeout)
         result = json.loads(resp.read().decode("utf-8"))
         json.dump(result, sys.stdout, ensure_ascii=False, indent=2)
         sys.stdout.write("\n")
