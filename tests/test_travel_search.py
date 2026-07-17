@@ -1206,6 +1206,24 @@ class TravelSearchTests(unittest.TestCase):
                     ),
                 )
 
+    def test_readme_leads_with_service_integrations(self):
+        """The first screen must name integrations and both connection modes."""
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        intro, demo_heading, _rest = readme.partition("## Демо")
+        self.assertEqual(demo_heading, "## Демо", msg="README demo heading missing")
+
+        expected_rows = (
+            "| **Aviasales** | Авиабилеты и календарь цен |",
+            "| **Travelata** | Пакетные туры |",
+            "| **Level.Travel** | Пакетные туры и отели без перелёта |",
+            "| **Sputnik8** | Экскурсии, билеты и активности |",
+        )
+        for row in expected_rows:
+            self.assertIn(row, intro, msg="README integration row missing: " + row)
+
+        self.assertIn("[Agent Skill](#установка)", intro)
+        self.assertIn("[удалённый MCP-сервер](#mcp-сервер)", intro)
+
     def test_readme_migration_and_russian(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         # 2.0.0 migration contract

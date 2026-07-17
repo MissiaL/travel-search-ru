@@ -5,7 +5,18 @@
 [![agentskills.io](https://img.shields.io/badge/agentskills.io-compatible-purple.svg)](https://agentskills.io)
 [![ClawHub](https://img.shields.io/badge/ClawHub-travel--search--ru-blue.svg)](https://clawhub.ai/skills/travel-search-ru)
 
-Навык агента для поиска путешествий: пакетные туры, отели, авиабилеты и экскурсии. Компактный Python CLI обращается к production MCP-эндпоинту.
+Интеграция AI-агентов с популярными туристическими сервисами: **Aviasales**, **Travelata**, **Level.Travel** и **Sputnik8**.
+
+Ищите авиабилеты, пакетные туры, отели и экскурсии прямо из Claude Code, Cursor, Gemini CLI, GitHub Copilot и других AI-агентов. Агент получает цены, ключевые параметры и короткие ссылки на выдачу.
+
+| Сервис | Что доступно |
+|--------|--------------|
+| **Aviasales** | Авиабилеты и календарь цен |
+| **Travelata** | Пакетные туры |
+| **Level.Travel** | Пакетные туры и отели без перелёта |
+| **Sputnik8** | Экскурсии, билеты и активности |
+
+**Два способа подключения:** [Agent Skill](#установка) или [удалённый MCP-сервер](#mcp-сервер).
 
 ## Демо
 
