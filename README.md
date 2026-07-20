@@ -120,7 +120,7 @@ claude mcp add --transport http travel-search-ru https://mcp.botclaw.ru/travel
 
 ## Изменения в 2.1.0
 
-`search-activities` объединяет Tripster и Sputnik8. Для экскурсий доступны фильтры `date_from`, `date_to`, `persons`, `children_allowed` и сортировка `recommended`, `price`, `rating` или `reviews`.
+`search-activities` объединяет Tripster и Sputnik8. Для экскурсий доступны необязательные фильтры дат `date_from` и `date_to`, `persons` от 1 до 100, `children_allowed` и сортировка `recommended`, `price`, `rating` или `reviews`.
 
 Каждая запись указывает `provider`, `price_unit` и `price_text`. Сравнивайте цены только с одинаковым `price_unit`: цена за человека, группу и билет — разные единицы.
 

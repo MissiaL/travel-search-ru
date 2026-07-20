@@ -1015,7 +1015,14 @@ class TravelSearchTests(unittest.TestCase):
 
     def test_no_prohibited_terms(self):
         # Build pattern without narrative occurrences of the banned words.
-        banned = ["aff" + "iliate", "comm" + "ission", "mar" + "ker"]
+        source_word = "par" + "tner"
+        allowed_route = "/travelata-" + source_word + "s/"
+        banned = [
+            "aff" + "iliate",
+            "comm" + "ission",
+            "mar" + "ker",
+            source_word + "s?",
+        ]
         prohibited = re.compile(
             r"\b(" + "|".join(banned) + r")\b", re.IGNORECASE
         )
@@ -1023,16 +1030,26 @@ class TravelSearchTests(unittest.TestCase):
         for p in ROOT.rglob("*"):
             if not p.is_file() or p.suffix not in {".md", ".py"}:
                 continue
-            if ".git" in p.parts or "__pycache__" in p.parts:
+            if (
+                ".git" in p.parts
+                or ".superpowers" in p.parts
+                or "__pycache__" in p.parts
+            ):
                 continue
             paths.append(p)
         for path in paths:
-            text = path.read_text(encoding="utf-8")
+            text = path.read_text(encoding="utf-8").replace(allowed_route, "")
             m = prohibited.search(text)
             if m:
                 self.fail(
                     "Prohibited term {0!r} in {1}".format(m.group(0), path)
                 )
+
+    def test_local_task_report_is_not_in_public_root(self):
+        self.assertFalse(
+            (ROOT / ".superpowers-task6-report.md").exists(),
+            msg="local task report must live under ignored .superpowers/sdd",
+        )
 
     def test_package_json_files_exist(self):
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
@@ -1225,6 +1242,23 @@ class TravelSearchTests(unittest.TestCase):
             self.assertIn(activity_example, text, msg=label)
             for field in ("date_from", "date_to", "persons", "children_allowed"):
                 self.assertIn(field, text, msg="{0} missing {1}".format(label, field))
+
+        for text, label in (
+            (skill, "SKILL.md"),
+            (usage, "references/usage.md"),
+            (readme, "README.md"),
+        ):
+            self.assertRegex(
+                text,
+                r"(?is)(?:optional|необязатель).*?date_from.*?date_to"
+                r"|date_from.*?date_to.*?(?:optional|необязатель)",
+                msg=label + " must say activity dates are optional",
+            )
+            self.assertRegex(
+                text,
+                r"(?is)persons.{0,100}(?:from\s+1\s+to\s+100|от\s+1\s+до\s+100|1\s*\.\.\s*100)",
+                msg=label + " must document persons range 1..100",
+            )
 
         self.assertIn("Tripster", readme)
         self.assertIn("Sputnik8", readme)
