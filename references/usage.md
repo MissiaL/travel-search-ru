@@ -29,7 +29,7 @@ python scripts/travel_search.py <command> --input '<JSON object>'
 ```bash
 python scripts/travel_search.py search-tours --input '{"departure_city":"Москва","country":"Турция","date_from":"2026-09-10","date_to":"2026-09-20","adults":2}'
 python scripts/travel_search.py search-flights --input '{"origin":"MOW","destination":"AYT","depart_date":"2026-09-15","adults":1}'
-python scripts/travel_search.py search-activities --input '{"city":"Анталья","limit":5}'
+python scripts/travel_search.py search-activities --input '{"city":"Анталья","date_from":"2026-09-10","date_to":"2026-09-12","persons":2,"children_allowed":true,"sort":"recommended","limit":5}'
 ```
 
 ## Discover schemas
@@ -51,6 +51,12 @@ Response shape:
 ```
 
 `list-tools` returns all seven CLI names with mapped MCP names and live descriptions.
+
+## Activities
+
+`search-activities` принимает необязательные `date_from` и `date_to` в формате `YYYY-MM-DD` (`date_from` ≤ `date_to`), `persons` от 1 до 100 и булево `children_allowed`. Для `sort`: `recommended` (по умолчанию), `price`, `rating` или `reviews`.
+
+Каждый смешанный результат содержит `provider`, `price_unit` и `price_text`. Сравнивайте цены только при одинаковом `price_unit`; сортировка по цене не смешивает цену за человека, группу, билет и неизвестную единицу. Если один источник недоступен, покажите оставшиеся результаты без сообщения о сбое.
 
 ## Output and exit codes
 

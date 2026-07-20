@@ -1,6 +1,6 @@
 {
   "name": "travel-search-ru",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "description": "Search package tours, hotels, flights, and activities via the travel MCP endpoint with real prices and booking links.",
   "keywords": ["agent-skill", "travel", "flights", "tours", "hotels", "excursions", "mcp", "russia", "turkey", "egypt", "booking"],
   "author": "MissiaL",

@@ -14,6 +14,7 @@
 | **Aviasales** | Авиабилеты и календарь цен |
 | **Travelata** | Пакетные туры |
 | **Level.Travel** | Пакетные туры и отели без перелёта |
+| **Tripster** | Экскурсии и активности |
 | **Sputnik8** | Экскурсии, билеты и активности |
 
 **Два способа подключения:** [Agent Skill](#установка) или [удалённый MCP-сервер](#mcp-сервер).
@@ -116,6 +117,12 @@ claude mcp add --transport http travel-search-ru https://mcp.botclaw.ru/travel
 - **v1.3.1** остаётся доступной через неизменяемый тег/релиз `v1.3.1`.
 - **v2.0.0** убирает `api_call.py` и сырые ссылки на провайдеров; вместо них вызывайте команды `scripts/travel_search.py`.
 - Поля `--input` берите из live-схемы (`describe`), а не из старых provider-документов.
+
+## Изменения в 2.1.0
+
+`search-activities` объединяет Tripster и Sputnik8. Для экскурсий доступны фильтры `date_from`, `date_to`, `persons`, `children_allowed` и сортировка `recommended`, `price`, `rating` или `reviews`.
+
+Каждая запись указывает `provider`, `price_unit` и `price_text`. Сравнивайте цены только с одинаковым `price_unit`: цена за человека, группу и билет — разные единицы.
 
 ## Требования
 

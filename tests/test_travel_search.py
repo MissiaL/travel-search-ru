@@ -928,7 +928,7 @@ class TravelSearchTests(unittest.TestCase):
     def test_version_synchronization(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(pkg["version"], "2.0.2")
+        self.assertEqual(pkg["version"], "2.1.0")
         data, _ = self._skill_frontmatter()
         meta = data.get("metadata")
         # Agent Skills: metadata must be a YAML mapping of string values
@@ -937,7 +937,7 @@ class TravelSearchTests(unittest.TestCase):
             meta, dict, msg="metadata must be a YAML block mapping"
         )
         self.assertEqual(meta.get("author"), "MissiaL")
-        self.assertEqual(str(meta.get("version")), "2.0.2")
+        self.assertEqual(str(meta.get("version")), "2.1.0")
         self.assertIsInstance(
             meta.get("version"),
             str,
@@ -968,11 +968,12 @@ class TravelSearchTests(unittest.TestCase):
             msg="metadata must not use inline JSON-style object syntax",
         )
         # CLI client info / User-Agent stay synchronized with the release
-        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.0.2")
+        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.1.0")
         src = (ROOT / "scripts" / "travel_search.py").read_text(encoding="utf-8")
-        self.assertIn('User-Agent", "travel-search-ru/2.0.2"', src)
+        self.assertIn('User-Agent", "travel-search-ru/2.1.0"', src)
         self.assertNotIn("2.0.1", pkg["version"])
         self.assertNotIn("2.0.0", pkg["version"])
+        self.assertNotIn("2.0.2", pkg["version"])
 
     def test_skill_md_line_limit(self):
         lines = (ROOT / "SKILL.md").read_text(encoding="utf-8").splitlines()
@@ -1150,7 +1151,9 @@ class TravelSearchTests(unittest.TestCase):
         )
         required_activity = (
             'python scripts/travel_search.py search-activities --input '
-            '\'{"city":"Анталья","limit":5}\''
+            '\'{"city":"Анталья","date_from":"2026-09-10",'
+            '"date_to":"2026-09-12","persons":2,'
+            '"children_allowed":true,"sort":"recommended","limit":5}\''
         )
         flight_input_re = re.compile(
             r"search-flights\s+--input\s+'(\{[^']*\})'"
@@ -1193,11 +1196,6 @@ class TravelSearchTests(unittest.TestCase):
             )
             for raw in activity_inputs:
                 payload = json.loads(raw)
-                self.assertNotIn(
-                    "date_from",
-                    payload,
-                    msg="{0}: activities must not use date_from".format(label),
-                )
                 self.assertIn(
                     "city",
                     payload,
@@ -1205,6 +1203,57 @@ class TravelSearchTests(unittest.TestCase):
                         label
                     ),
                 )
+
+    def test_2_1_0_activity_query_contract_in_public_docs(self):
+        """Public Skill docs must document the extended activity search contract."""
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        usage = (ROOT / "references" / "usage.md").read_text(encoding="utf-8")
+        pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(pkg["version"], "2.1.0")
+        metadata, _ = self._skill_frontmatter()
+        self.assertEqual(metadata["metadata"]["version"], "2.1.0")
+
+        activity_example = (
+            'python scripts/travel_search.py search-activities --input '
+            "'{\"city\":\"Анталья\",\"date_from\":\"2026-09-10\","
+            "\"date_to\":\"2026-09-12\",\"persons\":2,"
+            "\"children_allowed\":true,\"sort\":\"recommended\",\"limit\":5}'"
+        )
+        for text, label in ((skill, "SKILL.md"), (usage, "references/usage.md")):
+            self.assertIn(activity_example, text, msg=label)
+            for field in ("date_from", "date_to", "persons", "children_allowed"):
+                self.assertIn(field, text, msg="{0} missing {1}".format(label, field))
+
+        self.assertIn("Tripster", readme)
+        self.assertIn("Sputnik8", readme)
+
+    def test_2_1_0_activity_results_and_presentation_rules(self):
+        """Mixed activity results retain source and price semantics for agents."""
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        usage = (ROOT / "references" / "usage.md").read_text(encoding="utf-8")
+        docs = skill + "\n" + usage
+
+        for mode in ("recommended", "price", "rating", "reviews"):
+            self.assertIn(mode, docs)
+        for field in ("provider", "price_unit", "price_text"):
+            self.assertIn(field, docs)
+        self.assertRegex(
+            docs,
+            r"(?is)price_unit.*(?:same|matching|identical|сопоставим|одинаков)"
+            r"|(?:same|matching|identical|сопоставим|одинаков).*price_unit",
+            msg="price comparisons must be limited to like-for-like units",
+        )
+        self.assertRegex(
+            skill,
+            r"(?is)(?:one|single|один).*?(?:source|источник).*?"
+            r"(?:fails?|unavailable|сбо[ея]|недоступ).*?"
+            r"(?:without mentioning|silently|do not mention|молча|не сообща).*?"
+            r"(?:outage|failure|сбо[ея])|(?:without mentioning|silently|do not mention|молча|не сообща).*?"
+            r"(?:one|single|один).*?(?:source|источник)",
+            msg="surviving results must be presented without announcing one source outage",
+        )
 
     def test_readme_leads_with_service_integrations(self):
         """The first screen must name integrations and both connection modes."""
@@ -1247,7 +1296,7 @@ class TravelSearchTests(unittest.TestCase):
         # Russian product documentation: headings/body use Cyrillic
         cyr = re.findall(r"[А-Яа-яЁё]", readme)
         self.assertGreaterEqual(len(cyr), 80, msg="README should be Russian product docs")
-        # Expected Russian section markers (natural headings)
+        # Expected Russian section headings
         for heading in ("Установка", "Требования", "Лицензия"):
             self.assertIn(heading, readme)
 

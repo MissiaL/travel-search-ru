@@ -4,7 +4,7 @@ description: Use when the user explicitly asks to search or compare current trav
 compatibility: Requires Python 3.8+ and outbound HTTPS access to https://mcp.botclaw.ru/travel. Search criteria are sent to this read-only service; it does not book.
 metadata:
   author: MissiaL
-  version: "2.0.2"
+  version: "2.1.0"
   keywords: "travel,flights,tours,hotels,excursions,mcp,russia,turkey,egypt,booking"
   permissions: "outbound HTTPS only to https://mcp.botclaw.ru/travel; execute bundled scripts/travel_search.py"
 ---
@@ -30,7 +30,7 @@ Current tool schemas change over time. **Always** run `describe <command>` befor
 ```bash
 python scripts/travel_search.py search-tours --input '{"departure_city":"Москва","country":"Турция","date_from":"2026-09-10","date_to":"2026-09-20","adults":2}'
 python scripts/travel_search.py search-flights --input '{"origin":"MOW","destination":"AYT","depart_date":"2026-09-15","adults":1}'
-python scripts/travel_search.py search-activities --input '{"city":"Анталья","limit":5}'
+python scripts/travel_search.py search-activities --input '{"city":"Анталья","date_from":"2026-09-10","date_to":"2026-09-12","persons":2,"children_allowed":true,"sort":"recommended","limit":5}'
 ```
 
 ## Scope
@@ -64,6 +64,9 @@ If children are in the party and ages are unknown, **ask for ages** before prese
 | Excursions and activities | `search-activities` |
 | Resolve destinations / directories | `list-destinations` |
 
+## Activities
+
+`search-activities` принимает необязательные `date_from` и `date_to` в формате `YYYY-MM-DD` (`date_from` ≤ `date_to`), `persons` от 1 до 100 и булево `children_allowed`. Сортировка: `recommended` (по умолчанию), `price`, `rating` или `reviews`. В каждой записи указан источник `provider`, единица цены `price_unit` (`per_person`, `per_group`, `per_ticket` или `unknown`) и понятный текст `price_text`. Сравнивайте цены только при одинаковом `price_unit`; сортировка `price` не смешивает разные единицы.
 ## Workflow
 
 1. Clarify hard constraints (place, dates/nights, travelers, budget).
@@ -80,6 +83,7 @@ If children are in the party and ages are unknown, **ask for ages** before prese
 - **Fresh details** for a chosen tour use `get-tour-details`; do not reuse stale offer payloads as live quotes.
 - Prefer **short booking URLs** from the response. If a short URL is missing, **never** fall back to a raw/long provider URL.
 - **Cached flight prices** (including calendar data) are not live quotes — say they may be outdated.
+- Если один источник недоступен, молча покажите полученные результаты и не сообщайте о сбое.
 - Keep the requested geography; show actual sub-area names without switching regions silently.
 - Default presentation: 5–8 strong options, calm text layout, group tours by hotel when multiple offers share one property.
 - When tours and activities are both relevant, search activities even if tour results are thin.
