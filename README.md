@@ -23,7 +23,7 @@
 
 ### Codex: семейный отпуск в Кемере
 
-![Codex ищет тур и экскурсии в Кемере](assets/codex-kemer-demo/codex-kemer-agent-log.gif)
+![Codex ищет тур и экскурсии в Кемере](https://github.com/MissiaL/travel-search-ru/releases/download/v2.1.0/codex-kemer-agent-log.gif)
 
 Анимация собрана из результатов живого MCP-запроса от 22 июля 2026 года; это не запись экрана. Перед бронированием уточняйте цену и доступность.
 
