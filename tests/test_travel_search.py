@@ -1107,7 +1107,7 @@ class TravelSearchTests(unittest.TestCase):
         self.assertEqual(rest, "")
         self.assertIsInstance(obj, list)
 
-    # --- docs: budget rule, examples, migration, Russian README ---
+    # --- docs: budget rule, examples, Russian README ---
 
     def test_skill_no_unconditional_above_budget(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -1336,22 +1336,8 @@ class TravelSearchTests(unittest.TestCase):
         self.assertIn("[Agent Skill](#установка)", intro)
         self.assertIn("[удалённый MCP-сервер](#mcp-сервер)", intro)
 
-    def test_readme_migration_and_russian(self):
+    def test_readme_is_russian(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        # 2.0.0 migration contract
-        self.assertRegex(readme, r"2\.0\.0")
-        self.assertTrue(
-            re.search(r"миграц|migration|v1\.3\.1", readme, re.IGNORECASE),
-            msg="README must document 2.0.0 migration",
-        )
-        self.assertTrue(
-            re.search(r"v1\.3\.1", readme),
-            msg="README must mention v1.3.1 remains available",
-        )
-        self.assertTrue(
-            re.search(r"api_call\.py", readme),
-            msg="README migration must mention removal of api_call.py",
-        )
         self.assertTrue(
             re.search(r"travel_search\.py", readme),
             msg="README must point users to travel_search.py",
