@@ -1,11 +1,11 @@
 ---
 name: travel-search-ru
-description: Use when the user explicitly asks to search or compare current travel inventory, prices, availability, or booking links through this travel MCP (package tours, hotels, flights, or activities). Do not use for general travel advice, itinerary brainstorming, or non-search discussion. Optimized for Russian-language requests and a Russian-language catalog.
+description: "Use while planning a trip or vacation when current Russian-catalog options are needed: search and compare package tours, hotels, flights, excursions, activities, prices, availability, and booking links. Trigger on Russian requests: «спланировать путешествие», «подобрать тур», «найти отель/авиабилеты/экскурсии», «маршрут с актуальными ценами». Not for general advice without live search."
 compatibility: Requires Python 3.8+ and outbound HTTPS access to https://mcp.botclaw.ru/travel. Search criteria are sent to this read-only service; it does not book.
 metadata:
   author: MissiaL
-  version: "2.1.0"
-  keywords: "travel,flights,tours,hotels,excursions,mcp,russia,turkey,egypt,booking"
+  version: "2.1.1"
+  keywords: "travel,travel-planning,trip-planner,itinerary,flights,tours,hotels,excursions,activities,mcp,russia,turkey,egypt,путешествия,планирование путешествий,туры,авиабилеты,отели,экскурсии,booking"
   permissions: "outbound HTTPS only to https://mcp.botclaw.ru/travel; execute bundled scripts/travel_search.py"
 ---
 
@@ -35,7 +35,7 @@ python scripts/travel_search.py search-activities --input '{"city":"Анталь
 
 ## Scope
 
-- Finds package tours, hotel-only stays, flights, activities, and destination directories; returns prices and booking links when the server provides them.
+- Use this skill as the live-search layer of travel planning. Build itineraries with general reasoning; use the skill to find current package tours, hotel-only stays, flights, activities, destination directories, prices, and booking links.
 - Does **not** make bookings, store personal travel data, access email/calendar, or keep a long-term travel workspace.
 - Exact geography stays fixed unless the user explicitly agrees to broaden it.
 

@@ -5,9 +5,9 @@
 [![agentskills.io](https://img.shields.io/badge/agentskills.io-compatible-purple.svg)](https://agentskills.io)
 [![ClawHub](https://img.shields.io/badge/ClawHub-travel--search--ru-blue.svg)](https://clawhub.ai/skills/travel-search-ru)
 
-Интеграция AI-агентов с популярными туристическими сервисами: **Aviasales**, **Travelata**, **Level.Travel** и **Sputnik8**.
+Поисковый слой для планирования путешествий с популярными туристическими сервисами: **Aviasales**, **Travelata**, **Level.Travel** и **Sputnik8**.
 
-Ищите авиабилеты, пакетные туры, отели и экскурсии прямо из Claude Code, Cursor, Gemini CLI, GitHub Copilot и других AI-агентов. Агент получает цены, ключевые параметры и короткие ссылки на выдачу.
+Агент может составить маршрут своими обычными инструментами, а навык найдёт для него актуальные авиабилеты, пакетные туры, отели и экскурсии. В ответе будут цены, ключевые параметры и короткие ссылки на выдачу. Навык работает в Claude Code, Cursor, Gemini CLI, GitHub Copilot и других AI-агентах.
 
 | Сервис | Что доступно |
 |--------|--------------|
@@ -124,6 +124,10 @@ claude mcp add --transport http travel-search-ru https://mcp.botclaw.ru/travel
 - **v2.0.0** убирает `api_call.py` и сырые ссылки на провайдеров; вместо них вызывайте команды `scripts/travel_search.py`.
 - Поля `--input` берите из live-схемы (`describe`), а не из старых provider-документов.
 
+## Изменения в 2.1.1
+
+Навык лучше находится по русскоязычным запросам о планировании путешествия. Он подключается к планированию как источник актуальных туров, отелей, авиабилетов и экскурсий, а маршрут агент составляет своими обычными инструментами.
+
 ## Изменения в 2.1.0
 
 `search-activities` объединяет Tripster и Sputnik8. Для экскурсий доступны необязательные фильтры дат `date_from` и `date_to`, `persons` от 1 до 100, `children_allowed` и сортировка `recommended`, `price`, `rating` или `reviews`.
@@ -137,6 +141,7 @@ claude mcp add --transport http travel-search-ru https://mcp.botclaw.ru/travel
 
 ## Примеры запросов
 
+- «Спланируй поездку в Турцию на неделю с актуальными ценами»
 - «Найди туры в Турцию на двоих, 7 ночей в мае»
 - «Отель в Стамбуле без перелёта на 5 ночей»
 - «Дешёвые билеты из Москвы в Анталью в июне»

@@ -928,7 +928,7 @@ class TravelSearchTests(unittest.TestCase):
     def test_version_synchronization(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(pkg["version"], "2.1.0")
+        self.assertEqual(pkg["version"], "2.1.1")
         data, _ = self._skill_frontmatter()
         meta = data.get("metadata")
         # Agent Skills: metadata must be a YAML mapping of string values
@@ -937,7 +937,7 @@ class TravelSearchTests(unittest.TestCase):
             meta, dict, msg="metadata must be a YAML block mapping"
         )
         self.assertEqual(meta.get("author"), "MissiaL")
-        self.assertEqual(str(meta.get("version")), "2.1.0")
+        self.assertEqual(str(meta.get("version")), "2.1.1")
         self.assertIsInstance(
             meta.get("version"),
             str,
@@ -951,6 +951,9 @@ class TravelSearchTests(unittest.TestCase):
         )
         for kw in (
             "travel",
+            "travel-planning",
+            "trip-planner",
+            "itinerary",
             "flights",
             "tours",
             "hotels",
@@ -960,6 +963,8 @@ class TravelSearchTests(unittest.TestCase):
             "turkey",
             "egypt",
             "booking",
+            "путешествия",
+            "планирование путешествий",
         ):
             self.assertIn(kw, keywords)
         self.assertNotRegex(
@@ -968,9 +973,9 @@ class TravelSearchTests(unittest.TestCase):
             msg="metadata must not use inline JSON-style object syntax",
         )
         # CLI client info / User-Agent stay synchronized with the release
-        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.1.0")
+        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.1.1")
         src = (ROOT / "scripts" / "travel_search.py").read_text(encoding="utf-8")
-        self.assertIn('User-Agent", "travel-search-ru/2.1.0"', src)
+        self.assertIn('User-Agent", "travel-search-ru/2.1.1"', src)
         self.assertNotIn("2.0.1", pkg["version"])
         self.assertNotIn("2.0.0", pkg["version"])
         self.assertNotIn("2.0.2", pkg["version"])
@@ -1228,9 +1233,9 @@ class TravelSearchTests(unittest.TestCase):
         usage = (ROOT / "references" / "usage.md").read_text(encoding="utf-8")
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(pkg["version"], "2.1.0")
+        self.assertEqual(pkg["version"], "2.1.1")
         metadata, _ = self._skill_frontmatter()
-        self.assertEqual(metadata["metadata"]["version"], "2.1.0")
+        self.assertEqual(metadata["metadata"]["version"], "2.1.1")
 
         activity_example = (
             'python scripts/travel_search.py search-activities --input '
@@ -1376,43 +1381,42 @@ class TravelSearchTests(unittest.TestCase):
                 data[key] = val.strip("\"'")
         return data, skill
 
-    def test_skill_description_narrow_trigger_and_russian_scope(self):
-        """Frontmatter description must be narrowly triggered and RU-scoped."""
+    def test_skill_description_planning_trigger_and_russian_scope(self):
+        """Description must expose live search during travel planning."""
         data, skill = self._skill_frontmatter()
         desc = data.get("description") or ""
         if not isinstance(desc, str):
             desc = str(desc)
         desc = desc.strip()
+        self.assertLessEqual(len(desc), 400)
         self.assertTrue(
-            desc.startswith("Use when"),
-            msg="description must start with 'Use when'",
+            desc.startswith("Use while planning"),
+            msg="description must start with the travel-planning trigger",
         )
-        # Third-person narrow inventory/search trigger (not generic trip chat)
+        # Planning is a discovery trigger, but live inventory stays the capability.
         self.assertRegex(
             desc,
             r"search or compare|search(?:es)?|compare",
-            msg="description must require explicit search/compare intent",
+            msg="description must include search/compare intent",
         )
         self.assertRegex(
             desc,
             r"inventory|prices|availability|booking links",
             msg="description must target current inventory/prices/availability/links",
         )
-        # Explicit exclusions for broad travel chat
+        for phrase in (
+            "спланировать путешествие",
+            "подобрать тур",
+            "авиабилеты",
+            "экскурсии",
+            "маршрут с актуальными ценами",
+        ):
+            self.assertIn(phrase, desc)
+        # Pure advice without live search remains out of scope.
         self.assertRegex(
             desc,
-            r"general travel advice",
-            msg="description must exclude general travel advice",
-        )
-        self.assertRegex(
-            desc,
-            r"itinerary brainstorming",
-            msg="description must exclude itinerary brainstorming",
-        )
-        self.assertRegex(
-            desc,
-            r"non-search",
-            msg="description must exclude non-search discussion",
+            r"general advice without live search",
+            msg="description must exclude pure general advice",
         )
         # Must not keep the v2.0.0 broad trigger phrasing
         self.assertNotRegex(
@@ -1420,16 +1424,16 @@ class TravelSearchTests(unittest.TestCase):
             r"asks about travel,\s*flights,\s*airfare",
             msg="broad travel/trip-planning trigger must be removed",
         )
-        self.assertNotIn("trip planning", desc.lower())
-        # Russian-language / catalog scope
+        self.assertIn("planning a trip", desc.lower())
+        # Russian request / catalog scope
         self.assertRegex(
             desc,
-            r"Russian-language",
-            msg="description must state Russian-language optimization",
+            r"Russian requests",
+            msg="description must state Russian request scope",
         )
         self.assertRegex(
             desc,
-            r"Russian-language catalog|Russian catalog",
+            r"Russian-catalog",
             msg="description must state Russian-language catalog scope",
         )
 
