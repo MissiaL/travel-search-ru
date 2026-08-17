@@ -71,6 +71,11 @@ class _ServerState(object):
                 "inputSchema": {"type": "object", "properties": {}},
             },
             {
+                "name": "search_train_tickets",
+                "description": "Search trains",
+                "inputSchema": {"type": "object", "properties": {}},
+            },
+            {
                 "name": "search_activities",
                 "description": "Search activities",
                 "inputSchema": {"type": "object", "properties": {}},
@@ -450,7 +455,7 @@ class TravelSearchTests(unittest.TestCase):
         names = [t["name"] for t in tools]
         self.assertIn("search_tours", names)
         # must not pick the decoy id=999999 empty tools payload
-        self.assertEqual(len(tools), 7)
+        self.assertEqual(len(tools), 8)
 
     def test_session_header_preserved_on_tool_call(self):
         client = travel_search.McpClient(endpoint=self.server.endpoint, timeout=5)
@@ -463,18 +468,19 @@ class TravelSearchTests(unittest.TestCase):
 
     # --- CLI mappings ---
 
-    def test_all_seven_command_mappings(self):
+    def test_all_eight_command_mappings(self):
         expected = {
             "search-tours": "search_tours",
             "search-hotels": "search_hotels",
             "get-tour-details": "get_tour_details",
             "search-flights": "search_flights",
             "flight-calendar": "get_flight_price_calendar",
+            "search-trains": "search_train_tickets",
             "search-activities": "search_activities",
             "list-destinations": "list_destinations",
         }
         self.assertEqual(travel_search.COMMAND_TO_TOOL, expected)
-        self.assertEqual(len(travel_search.COMMAND_TO_TOOL), 7)
+        self.assertEqual(len(travel_search.COMMAND_TO_TOOL), 8)
 
         for cli_name, mcp_name in expected.items():
             _STATE.requests.clear()
@@ -635,7 +641,7 @@ class TravelSearchTests(unittest.TestCase):
             decoder = json.JSONDecoder()
             obj, idx = decoder.raw_decode(stdout.strip())
             self.assertEqual(stdout.strip()[idx:].strip(), "", msg=flag)
-            # usage plus seven command names
+            # usage plus all command names
             blob = json.dumps(data, ensure_ascii=False)
             for cmd in travel_search.COMMAND_TO_TOOL:
                 self.assertIn(cmd, blob, msg="{0}/{1}".format(flag, cmd))
@@ -671,12 +677,12 @@ class TravelSearchTests(unittest.TestCase):
         self.assertIn("inputSchema", data)
         self.assertEqual(data["inputSchema"]["type"], "object")
 
-    def test_list_tools_returns_seven_with_descriptions(self):
+    def test_list_tools_returns_eight_with_descriptions(self):
         code, stdout, _ = _run_main(["list-tools"])
         self.assertEqual(code, 0)
         data = _load_json_stdout(stdout)
         self.assertIsInstance(data, list)
-        self.assertEqual(len(data), 7)
+        self.assertEqual(len(data), 8)
         by_cli = {item["command"]: item for item in data}
         for cli, mcp in travel_search.COMMAND_TO_TOOL.items():
             self.assertIn(cli, by_cli)
@@ -928,7 +934,7 @@ class TravelSearchTests(unittest.TestCase):
     def test_version_synchronization(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(pkg["version"], "2.1.1")
+        self.assertEqual(pkg["version"], "2.2.0")
         data, _ = self._skill_frontmatter()
         meta = data.get("metadata")
         # Agent Skills: metadata must be a YAML mapping of string values
@@ -937,7 +943,7 @@ class TravelSearchTests(unittest.TestCase):
             meta, dict, msg="metadata must be a YAML block mapping"
         )
         self.assertEqual(meta.get("author"), "MissiaL")
-        self.assertEqual(str(meta.get("version")), "2.1.1")
+        self.assertEqual(str(meta.get("version")), "2.2.0")
         self.assertIsInstance(
             meta.get("version"),
             str,
@@ -955,6 +961,7 @@ class TravelSearchTests(unittest.TestCase):
             "trip-planner",
             "itinerary",
             "flights",
+            "trains",
             "tours",
             "hotels",
             "excursions",
@@ -973,16 +980,16 @@ class TravelSearchTests(unittest.TestCase):
             msg="metadata must not use inline JSON-style object syntax",
         )
         # CLI client info / User-Agent stay synchronized with the release
-        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.1.1")
+        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.2.0")
         src = (ROOT / "scripts" / "travel_search.py").read_text(encoding="utf-8")
-        self.assertIn('User-Agent", "travel-search-ru/2.1.1"', src)
+        self.assertIn('User-Agent", "travel-search-ru/2.2.0"', src)
         self.assertNotIn("2.0.1", pkg["version"])
         self.assertNotIn("2.0.0", pkg["version"])
         self.assertNotIn("2.0.2", pkg["version"])
 
     def test_skill_md_line_limit(self):
         lines = (ROOT / "SKILL.md").read_text(encoding="utf-8").splitlines()
-        self.assertLessEqual(len(lines), 95)
+        self.assertLessEqual(len(lines), 100)
 
     def test_skill_links_only_usage(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -1226,6 +1233,23 @@ class TravelSearchTests(unittest.TestCase):
                     ),
                 )
 
+    def test_2_2_0_train_search_contract_in_public_docs(self):
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        usage = (ROOT / "references" / "usage.md").read_text(encoding="utf-8")
+        example = (
+            'python scripts/travel_search.py search-trains --input '
+            "'{\"origin\":\"Москва\",\"destination\":\"Сочи\","
+            "\"depart_date\":\"2026-09-15\",\"sort\":\"price\",\"limit\":5}'"
+        )
+        for text, label in ((skill, "SKILL.md"), (usage, "references/usage.md")):
+            self.assertIn(example, text, msg=label)
+            self.assertRegex(text, r"(?is)Tutu\.ru.{0,200}(?:not real-time|not live|не real-time)")
+            self.assertRegex(text, r"(?is)(?:verify|провер).{0,120}(?:train|поезд|рейс)")
+        self.assertIn("search_train_tickets", usage)
+        self.assertIn("Tutu.ru", readme)
+        self.assertIn("кэширован", readme)
+
     def test_2_1_0_activity_query_contract_in_public_docs(self):
         """Public Skill docs must document the extended activity search contract."""
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -1233,9 +1257,9 @@ class TravelSearchTests(unittest.TestCase):
         usage = (ROOT / "references" / "usage.md").read_text(encoding="utf-8")
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(pkg["version"], "2.1.1")
+        self.assertEqual(pkg["version"], "2.2.0")
         metadata, _ = self._skill_frontmatter()
-        self.assertEqual(metadata["metadata"]["version"], "2.1.1")
+        self.assertEqual(metadata["metadata"]["version"], "2.2.0")
 
         activity_example = (
             'python scripts/travel_search.py search-activities --input '
@@ -1715,7 +1739,7 @@ class TravelSearchTests(unittest.TestCase):
         tools = client.list_tools()
         elapsed = time.monotonic() - t0
         self.assertIn("search_tours", [t["name"] for t in tools])
-        self.assertEqual(len(tools), 7)
+        self.assertEqual(len(tools), 8)
         # Stream holds open >= 1.5s; client must finish well before that.
         self.assertLess(
             elapsed,

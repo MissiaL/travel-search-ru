@@ -19,6 +19,7 @@ python scripts/travel_search.py <command> --input '<JSON object>'
 | `get-tour-details` | `get_tour_details` |
 | `search-flights` | `search_flights` |
 | `flight-calendar` | `get_flight_price_calendar` |
+| `search-trains` | `search_train_tickets` |
 | `search-activities` | `search_activities` |
 | `list-destinations` | `list_destinations` |
 
@@ -29,6 +30,7 @@ python scripts/travel_search.py <command> --input '<JSON object>'
 ```bash
 python scripts/travel_search.py search-tours --input '{"departure_city":"Москва","country":"Турция","date_from":"2026-09-10","date_to":"2026-09-20","adults":2}'
 python scripts/travel_search.py search-flights --input '{"origin":"MOW","destination":"AYT","depart_date":"2026-09-15","adults":1}'
+python scripts/travel_search.py search-trains --input '{"origin":"Москва","destination":"Сочи","depart_date":"2026-09-15","sort":"price","limit":5}'
 python scripts/travel_search.py search-activities --input '{"city":"Анталья","date_from":"2026-09-10","date_to":"2026-09-12","persons":2,"children_allowed":true,"sort":"recommended","limit":5}'
 ```
 
@@ -50,7 +52,16 @@ Response shape:
 }
 ```
 
-`list-tools` returns all seven CLI names with mapped MCP names and live descriptions.
+`list-tools` returns all eight CLI names with mapped MCP names and live descriptions.
+
+## Trains
+
+`search-trains` accepts Russian location names or 7-digit station codes,
+`depart_date` in `YYYY-MM-DD`, `sort` (`price`, `duration`, or `departure`), and
+`limit` from 1 to 20. Tutu.ru returns cached schedules and indicative prices,
+not live inventory. The date is used in the result link but does not filter the
+upstream timetable. Always tell the user to verify that the train runs, seats
+are available, and the final price on Tutu.ru.
 
 ## Activities
 
@@ -90,3 +101,4 @@ Useful partial multi-provider payloads without `isError: true` remain success (e
 - Refresh a chosen tour → `get-tour-details`.
 - Missing short booking URL → do not substitute a raw URL.
 - Flight prices from search/calendar may be cached — not live tickets.
+- Tutu.ru train schedules/fares are cached and not date-verified — keep the warning and verify details through the returned link.

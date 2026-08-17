@@ -1,8 +1,8 @@
 {
   "name": "travel-search-ru",
-  "version": "2.1.1",
-  "description": "Live search for planning trips: package tours, hotels, flights, excursions, prices, availability, and booking links.",
-  "keywords": ["agent-skill", "travel", "travel-planning", "trip-planner", "itinerary", "flights", "tours", "hotels", "excursions", "activities", "mcp", "russia", "turkey", "egypt", "путешествия", "планирование путешествий", "туры", "авиабилеты", "отели", "экскурсии", "booking"],
+  "version": "2.2.0",
+  "description": "Travel search for planning trips: tours, hotels, flights, trains, activities, prices, availability, and booking links.",
+  "keywords": ["agent-skill", "travel", "travel-planning", "trip-planner", "itinerary", "flights", "trains", "rail", "tours", "hotels", "excursions", "activities", "mcp", "russia", "turkey", "egypt", "путешествия", "планирование путешествий", "туры", "авиабилеты", "поезда", "жд билеты", "отели", "экскурсии", "booking"],
   "author": "MissiaL",
   "license": "MIT",
   "repository": {

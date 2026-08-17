@@ -1,17 +1,17 @@
 ---
 name: travel-search-ru
-description: "Use while planning a trip or vacation when current Russian-catalog options are needed: search and compare package tours, hotels, flights, excursions, activities, prices, availability, and booking links. Trigger on Russian requests: «спланировать путешествие», «подобрать тур», «найти отель/авиабилеты/экскурсии», «маршрут с актуальными ценами». Not for general advice without live search."
+description: "Use while planning a trip when Russian-catalog search is needed: package tours, hotels, flights, trains, excursions, prices, and booking links. Trigger on Russian requests: «спланировать путешествие», «подобрать тур», «найти отель/авиабилеты/жд билеты/экскурсии», «маршрут с актуальными ценами». Not for general advice without live search."
 compatibility: Requires Python 3.8+ and outbound HTTPS access to https://mcp.botclaw.ru/travel. Search criteria are sent to this read-only service; it does not book.
 metadata:
   author: MissiaL
-  version: "2.1.1"
-  keywords: "travel,travel-planning,trip-planner,itinerary,flights,tours,hotels,excursions,activities,mcp,russia,turkey,egypt,путешествия,планирование путешествий,туры,авиабилеты,отели,экскурсии,booking"
+  version: "2.2.0"
+  keywords: "travel,travel-planning,trip-planner,itinerary,flights,trains,rail,tours,hotels,excursions,activities,mcp,russia,turkey,egypt,путешествия,планирование путешествий,туры,авиабилеты,поезда,жд билеты,отели,экскурсии,booking"
   permissions: "outbound HTTPS only to https://mcp.botclaw.ru/travel; execute bundled scripts/travel_search.py"
 ---
 
 # Travel Search
 
-Search tours, hotels, flights, and activities through a single MCP-backed CLI.
+Search tours, hotels, flights, trains, and activities through a single MCP-backed CLI.
 
 ## CLI
 
@@ -21,7 +21,7 @@ python scripts/travel_search.py describe <command>
 python scripts/travel_search.py list-tools
 ```
 
-Commands: `search-tours`, `search-hotels`, `get-tour-details`, `search-flights`, `flight-calendar`, `search-activities`, `list-destinations`.
+Commands: `search-tours`, `search-hotels`, `get-tour-details`, `search-flights`, `flight-calendar`, `search-trains`, `search-activities`, `list-destinations`.
 
 Current tool schemas change over time. **Always** run `describe <command>` before a new parameter shape; do not invent fields from memory. See [references/usage.md](references/usage.md).
 
@@ -30,12 +30,13 @@ Current tool schemas change over time. **Always** run `describe <command>` befor
 ```bash
 python scripts/travel_search.py search-tours --input '{"departure_city":"Москва","country":"Турция","date_from":"2026-09-10","date_to":"2026-09-20","adults":2}'
 python scripts/travel_search.py search-flights --input '{"origin":"MOW","destination":"AYT","depart_date":"2026-09-15","adults":1}'
+python scripts/travel_search.py search-trains --input '{"origin":"Москва","destination":"Сочи","depart_date":"2026-09-15","sort":"price","limit":5}'
 python scripts/travel_search.py search-activities --input '{"city":"Анталья","date_from":"2026-09-10","date_to":"2026-09-12","persons":2,"children_allowed":true,"sort":"recommended","limit":5}'
 ```
 
 ## Scope
 
-- Use this skill as the live-search layer of travel planning. Build itineraries with general reasoning; use the skill to find current package tours, hotel-only stays, flights, activities, destination directories, prices, and booking links.
+- Use this skill as the search layer of travel planning. Build itineraries with general reasoning; use the skill to find package tours, hotel-only stays, flights, trains, activities, destination directories, prices, and booking links.
 - Does **not** make bookings, store personal travel data, access email/calendar, or keep a long-term travel workspace.
 - Exact geography stays fixed unless the user explicitly agrees to broaden it.
 
@@ -61,6 +62,7 @@ If children are in the party and ages are unknown, **ask for ages** before prese
 | Fresh price/availability before booking a tour | `get-tour-details` |
 | Flight options | `search-flights` |
 | Flight price calendar / flexible dates | `flight-calendar` |
+| Train schedule and indicative fares | `search-trains` |
 | Excursions and activities | `search-activities` |
 | Resolve destinations / directories | `list-destinations` |
 
@@ -83,6 +85,7 @@ If children are in the party and ages are unknown, **ask for ages** before prese
 - **Fresh details** for a chosen tour use `get-tour-details`; do not reuse stale offer payloads as live quotes.
 - Prefer **short booking URLs** from the response. If a short URL is missing, **never** fall back to a raw/long provider URL.
 - **Cached flight prices** (including calendar data) are not live quotes — say they may be outdated.
+- **Tutu.ru train data is not real-time.** The requested date only shapes the result link. Verify the train, seats, and final price on Tutu.ru; never present `min_price_rub` as confirmed availability.
 - Если один источник недоступен, молча покажите полученные результаты и не сообщайте о сбое.
 - Keep the requested geography; show actual sub-area names without switching regions silently.
 - Default presentation: 5–8 strong options, calm text layout, group tours by hotel when multiple offers share one property.
@@ -91,5 +94,6 @@ If children are in the party and ages are unknown, **ask for ages** before prese
 ## Presentation
 
 - Flights: route, dates, price, transfers/baggage notes if present, then link.
+- Trains: train number, departure/arrival time, travel time, indicative carriage prices, the non-real-time warning, then link.
 - Tours/hotels: property, stars/rating, area, meal, check-in and nights, price, brief fit note, then link.
 - Prefer short conclusions over long tables.
