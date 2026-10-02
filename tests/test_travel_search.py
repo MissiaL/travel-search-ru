@@ -51,6 +51,11 @@ class _ServerState(object):
                 },
             },
             {
+                "name": "get_cheapest_travelata_tours",
+                "description": "Cheapest Travelata tours",
+                "inputSchema": {"type": "object", "properties": {}},
+            },
+            {
                 "name": "search_hotels",
                 "description": "Search hotels only",
                 "inputSchema": {"type": "object", "properties": {}},
@@ -103,8 +108,9 @@ class _ServerState(object):
         self.stream_mode = None  # type: Optional[str]
         self.stream_hold_seconds = 1.2
         self.stream_keepalive_interval = 0.05
-        # Initialize result protocolVersion override (str | omit | other)
-        self.init_protocol_version = "2024-11-05"  # type: Optional[str]
+        # Initialize result protocolVersion override; None echoes the request.
+        self.init_protocol_version = None  # type: Optional[str]
+        self.retry_after = None  # type: Optional[str]
         self.omit_init_protocol_version = False
 
 
@@ -150,6 +156,8 @@ class FakeMcpHandler(BaseHTTPRequestHandler):
                 b'{"error":"server boom","body":"https://evil.example/secret"}'
             )
             self.send_response(_STATE.http_status)
+            if _STATE.retry_after is not None:
+                self.send_header("Retry-After", _STATE.retry_after)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
@@ -198,7 +206,9 @@ class FakeMcpHandler(BaseHTTPRequestHandler):
                 "serverInfo": {"name": "fake-travel", "version": "0.0.1"},
             }
             if not _STATE.omit_init_protocol_version:
-                result["protocolVersion"] = _STATE.init_protocol_version
+                result["protocolVersion"] = _STATE.init_protocol_version or (
+                    (body.get("params") or {}).get("protocolVersion")
+                )
             payload = _json_rpc_result(req_id, result)
         elif method == "tools/list":
             payload = _json_rpc_result(req_id, {"tools": _STATE.tools})
@@ -455,7 +465,7 @@ class TravelSearchTests(unittest.TestCase):
         names = [t["name"] for t in tools]
         self.assertIn("search_tours", names)
         # must not pick the decoy id=999999 empty tools payload
-        self.assertEqual(len(tools), 8)
+        self.assertEqual(len(tools), 9)
 
     def test_session_header_preserved_on_tool_call(self):
         client = travel_search.McpClient(endpoint=self.server.endpoint, timeout=5)
@@ -468,9 +478,10 @@ class TravelSearchTests(unittest.TestCase):
 
     # --- CLI mappings ---
 
-    def test_all_eight_command_mappings(self):
+    def test_all_nine_command_mappings(self):
         expected = {
             "search-tours": "search_tours",
+            "cheapest-tours": "get_cheapest_travelata_tours",
             "search-hotels": "search_hotels",
             "get-tour-details": "get_tour_details",
             "search-flights": "search_flights",
@@ -480,7 +491,7 @@ class TravelSearchTests(unittest.TestCase):
             "list-destinations": "list_destinations",
         }
         self.assertEqual(travel_search.COMMAND_TO_TOOL, expected)
-        self.assertEqual(len(travel_search.COMMAND_TO_TOOL), 8)
+        self.assertEqual(len(travel_search.COMMAND_TO_TOOL), 9)
 
         for cli_name, mcp_name in expected.items():
             _STATE.requests.clear()
@@ -573,14 +584,17 @@ class TravelSearchTests(unittest.TestCase):
         self.assertTrue(data.get("partial"))
         self.assertEqual(len(data["results"]), 1)
 
-    def test_is_error_true_exits_1_hides_content(self):
+    def test_is_error_true_exits_1_surfaces_sanitized_text(self):
         _STATE.tool_result = {
             "isError": True,
             "content": [
                 {
                     "type": "text",
-                    "text": "malicious leak https://evil.example/steal?token=abc123",
-                }
+                    "text": "Error executing tool search_tours: Дата date_from "
+                    "уже прошла. Подробнее https://evil.example/steal?token=abc123\n"
+                    "www.evil.example/x",
+                },
+                {"type": "text", "text": "second item never shown"},
             ],
             "structuredContent": {
                 "secret": "https://evil.example/raw-booking/xyz",
@@ -591,18 +605,38 @@ class TravelSearchTests(unittest.TestCase):
         self.assertEqual(code, 1)
         data = _load_json_stdout(stdout)
         self.assertTrue(data.get("error"))
+        self.assertEqual(data["category"], "tool_error")
+        # server's model-facing text, prefix and URLs removed
+        self.assertEqual(data["message"], "Дата date_from уже прошла. Подробнее")
         blob = stdout + err
+        self.assertNotIn("Error executing tool", blob)
         self.assertNotIn("evil.example", blob)
-        self.assertNotIn("malicious leak", blob)
         self.assertNotIn("steal", blob)
         self.assertNotIn("abc123", blob)
+        self.assertNotIn("second item", blob)
         self.assertNotIn("raw-booking", blob)
         self.assertNotIn("stack trace", blob)
+        # stderr carries only the category token
+        self.assertEqual(err.strip(), "tool_error")
         # exactly one JSON document on stdout
         decoder = json.JSONDecoder()
         obj, idx = decoder.raw_decode(stdout.strip())
         self.assertEqual(stdout.strip()[idx:].strip(), "")
         self.assertIsInstance(obj, dict)
+
+    def test_is_error_message_capped_and_defaulted(self):
+        _STATE.tool_result = {
+            "isError": True,
+            "content": [{"type": "text", "text": "Ошибка " * 100}],
+        }
+        code, stdout, _ = _run_main(["search-tours", "--input", "{}"])
+        self.assertEqual(code, 1)
+        self.assertEqual(len(_load_json_stdout(stdout)["message"]), 300)
+        for content in (None, [], [{"type": "text", "text": "https://x.example/"}]):
+            _STATE.tool_result = {"isError": True, "content": content}
+            code, stdout, _ = _run_main(["search-tours", "--input", "{}"])
+            self.assertEqual(code, 1)
+            self.assertEqual(_load_json_stdout(stdout)["message"], "tool error")
 
     def test_partial_structured_without_is_error_stays_success(self):
         _STATE.tool_result = {
@@ -677,12 +711,12 @@ class TravelSearchTests(unittest.TestCase):
         self.assertIn("inputSchema", data)
         self.assertEqual(data["inputSchema"]["type"], "object")
 
-    def test_list_tools_returns_eight_with_descriptions(self):
+    def test_list_tools_returns_nine_with_descriptions(self):
         code, stdout, _ = _run_main(["list-tools"])
         self.assertEqual(code, 0)
         data = _load_json_stdout(stdout)
         self.assertIsInstance(data, list)
-        self.assertEqual(len(data), 8)
+        self.assertEqual(len(data), 9)
         by_cli = {item["command"]: item for item in data}
         for cli, mcp in travel_search.COMMAND_TO_TOOL.items():
             self.assertIn(cli, by_cli)
@@ -733,6 +767,85 @@ class TravelSearchTests(unittest.TestCase):
         self.assertNotIn("server boom", blob)
         self.assertNotIn("https://evil.example/secret", blob)
         self.assertNotIn("evil.example", blob)
+
+    def test_http_429_reports_rate_limited(self):
+        _STATE.http_status = 429
+        for header, message in (
+            ("60", "rate limited; retry after 60 s"),
+            ("Wed, 21 Oct 2026 07:28:00 GMT", "rate limited"),
+            (None, "rate limited"),
+        ):
+            _STATE.retry_after = header
+            code, stdout, err = _run_main(["search-tours", "--input", "{}"])
+            self.assertEqual(code, 1)
+            data = _load_json_stdout(stdout)
+            self.assertEqual(data["category"], "rate_limited")
+            self.assertEqual(data["message"], message)
+            self.assertNotIn("evil.example", stdout + err)
+
+    def test_cheapest_tours_maps_to_travelata_tool(self):
+        payload = {
+            "departure_city": "Москва",
+            "country": "Турция",
+            "date_from": "YYYY-MM-DD",
+            "date_to": "YYYY-MM-DD",
+            "nights_min": 7,
+            "nights_max": 9,
+            "resorts": ["Кемер", "Белек"],
+            "meals": ["AI", "UAI"],
+            "limit": 5,
+        }
+        code, stdout, _ = _run_main(
+            ["cheapest-tours", "--input", json.dumps(payload, ensure_ascii=False)]
+        )
+        self.assertEqual(code, 0)
+        call = [
+            r for r in _STATE.requests if r["body"].get("method") == "tools/call"
+        ][0]
+        self.assertEqual(
+            call["body"]["params"],
+            {"name": "get_cheapest_travelata_tours", "arguments": payload},
+        )
+        code, stdout, _ = _run_main(["describe", "cheapest-tours"])
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            _load_json_stdout(stdout)["name"], "get_cheapest_travelata_tours"
+        )
+
+    def test_non_utf8_stdout_still_one_json_document(self):
+        _STATE.tool_result = {"structuredContent": {"city": "Москва", "price": "1 000 ₽"}}
+        script = (
+            "import sys\n"
+            "sys.path.insert(0, {scripts!r})\n"
+            "import travel_search as t\n"
+            "base = t.McpClient\n"
+            "class C(base):\n"
+            "    def __init__(self, endpoint={endpoint!r}, timeout=5):\n"
+            "        base.__init__(self, endpoint=endpoint, timeout=timeout)\n"
+            "t.McpClient = C\n"
+            "sys.exit(t.main(['search-tours', '--input', '{{}}']))\n"
+        ).format(scripts=str(SCRIPTS), endpoint=self.server.endpoint)
+        env = dict(os.environ, PYTHONIOENCODING="cp1252")
+        proc = subprocess.run(
+            [sys.executable, "-c", script], capture_output=True, env=env, timeout=30
+        )
+        self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+        self.assertEqual(
+            json.loads(proc.stdout.decode("utf-8")),
+            {"city": "Москва", "price": "1 000 ₽"},
+        )
+
+        # Stream that cannot be reconfigured falls back to ASCII-escaped JSON.
+        raw = io.BytesIO()
+        stream = io.TextIOWrapper(raw, encoding="cp1252")
+        orig = sys.stdout
+        sys.stdout = stream
+        try:
+            travel_search._print_json({"city": "Москва"})
+            stream.flush()
+        finally:
+            sys.stdout = orig
+        self.assertEqual(raw.getvalue(), b'{"city":"\\u041c\\u043e\\u0441\\u043a\\u0432\\u0430"}\n')
 
     def test_jsonrpc_error_exits_1(self):
         _STATE.jsonrpc_error = {
@@ -934,7 +1047,7 @@ class TravelSearchTests(unittest.TestCase):
     def test_version_synchronization(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(pkg["version"], "2.2.0")
+        self.assertEqual(pkg["version"], "2.3.0")
         data, _ = self._skill_frontmatter()
         meta = data.get("metadata")
         # Agent Skills: metadata must be a YAML mapping of string values
@@ -943,7 +1056,7 @@ class TravelSearchTests(unittest.TestCase):
             meta, dict, msg="metadata must be a YAML block mapping"
         )
         self.assertEqual(meta.get("author"), "MissiaL")
-        self.assertEqual(str(meta.get("version")), "2.2.0")
+        self.assertEqual(str(meta.get("version")), "2.3.0")
         self.assertIsInstance(
             meta.get("version"),
             str,
@@ -980,16 +1093,22 @@ class TravelSearchTests(unittest.TestCase):
             msg="metadata must not use inline JSON-style object syntax",
         )
         # CLI client info / User-Agent stay synchronized with the release
-        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.2.0")
-        src = (ROOT / "scripts" / "travel_search.py").read_text(encoding="utf-8")
-        self.assertIn('User-Agent", "travel-search-ru/2.2.0"', src)
+        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.3.0")
+        client = travel_search.McpClient(endpoint=self.server.endpoint, timeout=5)
+        client.list_tools()
+        for r in _STATE.requests:
+            self.assertEqual(r["headers"].get("user-agent"), "travel-search-ru/2.3.0")
+            if r["body"].get("method") == "initialize":
+                self.assertEqual(
+                    r["body"]["params"]["clientInfo"]["version"], "2.3.0"
+                )
         self.assertNotIn("2.0.1", pkg["version"])
         self.assertNotIn("2.0.0", pkg["version"])
         self.assertNotIn("2.0.2", pkg["version"])
 
     def test_skill_md_line_limit(self):
         lines = (ROOT / "SKILL.md").read_text(encoding="utf-8").splitlines()
-        self.assertLessEqual(len(lines), 100)
+        self.assertLessEqual(len(lines), 130)
 
     def test_skill_links_only_usage(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -1158,8 +1277,8 @@ class TravelSearchTests(unittest.TestCase):
             # required tour example shape (values from spec)
             self.assertIn("Москва", text, msg=label)
             self.assertIn("Турция", text, msg=label)
-            self.assertIn("2026-09-10", text, msg=label)
-            self.assertIn("2026-09-20", text, msg=label)
+            self.assertIn('"date_from":"YYYY-MM-DD"', text, msg=label)
+            self.assertIn('"date_to":"YYYY-MM-DD"', text, msg=label)
         # invalid old-style destination-only tour example must not remain as the tour demo
         self.assertNotIn(
             '{"destination":"Turkey","adults":2}',
@@ -1176,12 +1295,12 @@ class TravelSearchTests(unittest.TestCase):
         usage = (ROOT / "references" / "usage.md").read_text(encoding="utf-8")
         required_flight = (
             'python scripts/travel_search.py search-flights --input '
-            '\'{"origin":"MOW","destination":"AYT","depart_date":"2026-09-15","adults":1}\''
+            '\'{"origin":"MOW","destination":"AYT","depart_date":"YYYY-MM-DD","adults":1}\''
         )
         required_activity = (
             'python scripts/travel_search.py search-activities --input '
-            '\'{"city":"Анталья","date_from":"2026-09-10",'
-            '"date_to":"2026-09-12","persons":2,'
+            '\'{"city":"Анталья","date_from":"YYYY-MM-DD",'
+            '"date_to":"YYYY-MM-DD","persons":2,'
             '"children_allowed":true,"sort":"recommended","limit":5}\''
         )
         flight_input_re = re.compile(
@@ -1240,7 +1359,7 @@ class TravelSearchTests(unittest.TestCase):
         example = (
             'python scripts/travel_search.py search-trains --input '
             "'{\"origin\":\"Москва\",\"destination\":\"Сочи\","
-            "\"depart_date\":\"2026-09-15\",\"sort\":\"price\",\"limit\":5}'"
+            "\"depart_date\":\"YYYY-MM-DD\",\"sort\":\"price\",\"limit\":5}'"
         )
         for text, label in ((skill, "SKILL.md"), (usage, "references/usage.md")):
             self.assertIn(example, text, msg=label)
@@ -1257,14 +1376,14 @@ class TravelSearchTests(unittest.TestCase):
         usage = (ROOT / "references" / "usage.md").read_text(encoding="utf-8")
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(pkg["version"], "2.2.0")
+        self.assertEqual(pkg["version"], "2.3.0")
         metadata, _ = self._skill_frontmatter()
-        self.assertEqual(metadata["metadata"]["version"], "2.2.0")
+        self.assertEqual(metadata["metadata"]["version"], "2.3.0")
 
         activity_example = (
             'python scripts/travel_search.py search-activities --input '
-            "'{\"city\":\"Анталья\",\"date_from\":\"2026-09-10\","
-            "\"date_to\":\"2026-09-12\",\"persons\":2,"
+            "'{\"city\":\"Анталья\",\"date_from\":\"YYYY-MM-DD\","
+            "\"date_to\":\"YYYY-MM-DD\",\"persons\":2,"
             "\"children_allowed\":true,\"sort\":\"recommended\",\"limit\":5}'"
         )
         for text, label in ((skill, "SKILL.md"), (usage, "references/usage.md")):
@@ -1317,6 +1436,27 @@ class TravelSearchTests(unittest.TestCase):
             r"(?:one|single|один).*?(?:source|источник)",
             msg="surviving results must be presented without announcing one source outage",
         )
+
+    def test_2_3_0_dates_meals_errors_in_skill_docs(self):
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        usage = (ROOT / "references" / "usage.md").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for text, label in (
+            (skill, "SKILL.md"),
+            (usage, "references/usage.md"),
+            (readme, "README.md"),
+        ):
+            # Concrete example dates go stale; docs use placeholders.
+            self.assertNotRegex(text, r"\b20\d\d-\d\d-\d\d\b", msg=label)
+            self.assertIn("cheapest-tours", text, msg=label)
+        for text, label in ((skill, "SKILL.md"), (usage, "references/usage.md")):
+            self.assertIn("date +%F", text, msg=label)
+            for code in ("RO", "BB", "HB", "FB", "AI", "UAI"):
+                self.assertRegex(text, r"`{0}`".format(code), msg=label)
+            for field in ("nights_min", "nights_max", "return_date", "YYYY-MM"):
+                self.assertIn(field, text, msg=label)
+            self.assertIn("rate_limited", text, msg=label)
+        self.assertIn("## Ошибки", skill)
 
     def test_readme_leads_with_service_integrations(self):
         """The first screen must name integrations and both connection modes."""
@@ -1676,6 +1816,7 @@ class TravelSearchTests(unittest.TestCase):
                 "scripts/travel_search.py",
                 "references/usage.md",
                 "README.md",
+                "LICENSE",
             ],
         )
 
@@ -1705,6 +1846,7 @@ class TravelSearchTests(unittest.TestCase):
             "scripts/travel_search.py",
             "references/usage.md",
             "README.md",
+            "LICENSE",
         }
         self.assertEqual(set(paths), expected)
         for p in paths:
@@ -1725,7 +1867,7 @@ class TravelSearchTests(unittest.TestCase):
         tools = client.list_tools()
         elapsed = time.monotonic() - t0
         self.assertIn("search_tours", [t["name"] for t in tools])
-        self.assertEqual(len(tools), 8)
+        self.assertEqual(len(tools), 9)
         # Stream holds open >= 1.5s; client must finish well before that.
         self.assertLess(
             elapsed,
@@ -1864,8 +2006,24 @@ class TravelSearchTests(unittest.TestCase):
         self.assertNotIn("notifications/initialized", methods)
         self.assertNotIn("tools/list", methods)
 
+    def test_initialize_requests_newest_protocol_version(self):
+        client = travel_search.McpClient(endpoint=self.server.endpoint, timeout=5)
+        client.list_tools()
+        init = _STATE.requests[0]["body"]
+        self.assertEqual(init["method"], "initialize")
+        self.assertEqual(init["params"]["protocolVersion"], "2025-06-18")
+
+    def test_older_known_protocol_version_accepted_and_sent(self):
+        for version in ("2025-03-26", "2024-11-05"):
+            _STATE.requests.clear()
+            _STATE.init_protocol_version = version
+            client = travel_search.McpClient(endpoint=self.server.endpoint, timeout=5)
+            client.list_tools()
+            for r in _STATE.requests[1:]:
+                self.assertEqual(r["headers"].get("mcp-protocol-version"), version)
+
     def test_mismatched_initialize_protocol_version_rejected(self):
-        _STATE.init_protocol_version = "2025-03-26"
+        _STATE.init_protocol_version = "2099-01-01"
         client = travel_search.McpClient(endpoint=self.server.endpoint, timeout=5)
         with self.assertRaises(travel_search.McpError) as ctx:
             client.list_tools()

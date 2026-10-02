@@ -60,6 +60,7 @@ MCP https://mcp.botclaw.ru/travel (Streamable HTTP)
 | Команда CLI | Назначение |
 |-------------|------------|
 | `search-tours` | Пакетные туры (перелёт + отель) |
+| `cheapest-tours` | Быстрая подборка самых дешёвых туров Travelata |
 | `search-hotels` | Отели без перелёта |
 | `get-tour-details` | Актуальные детали тура перед бронированием |
 | `search-flights` | Варианты перелётов |
@@ -83,8 +84,10 @@ git clone https://github.com/MissiaL/travel-search-ru.git travel-search-ru
 ```bash
 python scripts/travel_search.py list-tools
 python scripts/travel_search.py describe search-tours
-python scripts/travel_search.py search-tours --input '{"departure_city":"Москва","country":"Турция","date_from":"2026-09-10","date_to":"2026-09-20","adults":2}'
+python scripts/travel_search.py search-tours --input '{"departure_city":"Москва","country":"Турция","date_from":"YYYY-MM-DD","date_to":"YYYY-MM-DD","nights_min":7,"nights_max":10,"adults":2}'
 ```
+
+Вместо `YYYY-MM-DD` подставьте реальные даты не раньше сегодняшней.
 
 Актуальные схемы полей — через `describe`, см. [references/usage.md](references/usage.md).
 
@@ -92,6 +95,8 @@ python scripts/travel_search.py search-tours --input '{"departure_city":"Мос�
 
 - `search-trains` возвращает кэшированное расписание Tutu.ru и ориентировочные цены. Дата используется в ссылке на выдачу; наличие поезда, мест и итоговую цену нужно проверить перед бронированием.
 - У `search-activities` поля `date_from` и `date_to` необязательны, а `persons` принимает значения от 1 до 100.
+- Для туров и отелей окно дат вылета (заезда) — не больше 30 дней, диапазон ночей лучше задавать явно и не шире 5 значений, питание — кодами `RO`, `BB`, `HB`, `FB`, `AI`, `UAI`.
+- Если сервер вернул ошибку, CLI передаёт её текст в поле `message` (категория `tool_error`); при перегрузке сервиса — категория `rate_limited`.
 
 ## MCP-сервер
 
@@ -141,4 +146,4 @@ claude mcp add --transport http travel-search-ru https://mcp.botclaw.ru/travel
 
 ## Лицензия
 
-MIT
+MIT — см. [LICENSE](LICENSE).

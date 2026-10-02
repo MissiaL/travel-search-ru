@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import socket
 import ssl
 import sys
@@ -20,6 +21,7 @@ DEFAULT_TIMEOUT_SECONDS = 90
 
 COMMAND_TO_TOOL = {
     "search-tours": "search_tours",
+    "cheapest-tours": "get_cheapest_travelata_tours",
     "search-hotels": "search_hotels",
     "get-tour-details": "get_tour_details",
     "search-flights": "search_flights",
@@ -29,8 +31,16 @@ COMMAND_TO_TOOL = {
     "list-destinations": "list_destinations",
 }
 
-_PROTOCOL_VERSION = "2024-11-05"
-_CLIENT_INFO = {"name": "travel-search-ru", "version": "2.2.0"}
+_VERSION = "2.3.0"
+# Newest first; the first entry is requested in initialize.
+_SUPPORTED_PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
+_PROTOCOL_VERSION = _SUPPORTED_PROTOCOL_VERSIONS[0]
+_CLIENT_INFO = {"name": "travel-search-ru", "version": _VERSION}
+
+# Server tool-error text is shown to the agent without URLs and bounded.
+_TOOL_ERROR_PREFIX_RE = re.compile(r"^Error executing tool [\w.-]+:\s*")
+_URL_RE = re.compile(r"(?i)\b(?:https?|ftp)://\S+|\bwww\.\S+")
+_MAX_ERROR_CHARS = 300
 
 
 class McpError(RuntimeError):
@@ -107,7 +117,7 @@ class McpClient(object):
         req = urllib.request.Request(self.endpoint, data=data, method="POST")
         req.add_header("Content-Type", "application/json")
         req.add_header("Accept", "application/json, text/event-stream")
-        req.add_header("User-Agent", "travel-search-ru/2.2.0")
+        req.add_header("User-Agent", "travel-search-ru/" + _VERSION)
         if self._session_id:
             req.add_header("Mcp-Session-Id", self._session_id)
         if self._protocol_version:
@@ -389,7 +399,14 @@ class McpClient(object):
             resp = self._opener.open(req, timeout=remaining)
         except McpError:
             raise
-        except urllib.error.HTTPError:
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429:
+                retry = (exc.headers.get("Retry-After") or "").strip()
+                if retry.isdigit():
+                    raise McpError(
+                        "rate_limited", "rate limited; retry after %s s" % retry
+                    )
+                raise McpError("rate_limited", "rate limited")
             raise McpError("http_error", "HTTP error")
         except socket.timeout:
             raise McpError("timeout", "timeout")
@@ -445,7 +462,7 @@ class McpClient(object):
         if not isinstance(result, dict):
             raise McpError("protocol_version", "unsupported protocol version")
         negotiated = result.get("protocolVersion")
-        if negotiated != _PROTOCOL_VERSION:
+        if negotiated not in _SUPPORTED_PROTOCOL_VERSIONS:
             raise McpError("protocol_version", "unsupported protocol version")
         self._protocol_version = negotiated
         note = {
@@ -491,9 +508,10 @@ def _normalize_tool_result(result):
         return {}
     if not isinstance(result, dict):
         return result
-    # Tool-level error: never normalize or emit content / structuredContent.
+    # Tool-level error: surface only the sanitized server text, never
+    # structuredContent or raw content items.
     if result.get("isError") is True:
-        raise McpError("tool_error", "tool error")
+        raise McpError("tool_error", _tool_error_message(result))
     if "structuredContent" in result and result["structuredContent"] is not None:
         return result["structuredContent"]
     content = result.get("content")
@@ -512,9 +530,29 @@ def _normalize_tool_result(result):
     return result
 
 
+def _tool_error_message(result):
+    """First text content item without tool prefix and URLs, capped."""
+    content = result.get("content")
+    for item in content if isinstance(content, list) else []:
+        if isinstance(item, dict) and item.get("type") == "text":
+            text = item.get("text") if isinstance(item.get("text"), str) else ""
+            text = _TOOL_ERROR_PREFIX_RE.sub("", text.strip())
+            text = " ".join(_URL_RE.sub("", text).split())
+            return text[:_MAX_ERROR_CHARS] or "tool error"
+    return "tool error"
+
+
 def _print_json(obj):
-    json.dump(obj, sys.stdout, ensure_ascii=False, separators=(",", ":"))
-    sys.stdout.write("\n")
+    text = json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+    try:
+        sys.stdout.write(text + "\n")
+    except UnicodeEncodeError:
+        # Non-UTF-8 stream that could not be reconfigured: stay one valid
+        # JSON document by escaping non-ASCII. TextIOWrapper encodes the whole
+        # string before buffering, so nothing was written on failure.
+        sys.stdout.write(
+            json.dumps(obj, ensure_ascii=True, separators=(",", ":")) + "\n"
+        )
 
 
 def _fail(code, category, message):
@@ -573,6 +611,13 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
 
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if reconfigure is not None:
+        try:
+            reconfigure(encoding="utf-8")
+        except Exception:
+            pass  # _print_json falls back to ASCII-escaped JSON
+
     parser = _QuietParser(
         prog="travel_search.py",
         description="Travel search via MCP Streamable HTTP",
@@ -612,7 +657,7 @@ def main(argv=None):
             return _cmd_call(args.command, arguments)
         return _fail(2, "usage", "unknown command")
     except McpError as exc:
-        return _fail(1, exc.category, exc.category)
+        return _fail(1, exc.category, str(exc))
     except Exception:
         return _fail(1, "internal", "internal error")
 

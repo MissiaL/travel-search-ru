@@ -4,7 +4,7 @@ description: "Use while planning a trip when Russian-catalog search is needed: p
 compatibility: Requires Python 3.8+ and outbound HTTPS access to https://mcp.botclaw.ru/travel. Search criteria are sent to this read-only service; it does not book.
 metadata:
   author: MissiaL
-  version: "2.2.0"
+  version: "2.3.0"
   keywords: "travel,travel-planning,trip-planner,itinerary,flights,trains,rail,tours,hotels,excursions,activities,mcp,russia,turkey,egypt,путешествия,планирование путешествий,туры,авиабилеты,поезда,жд билеты,отели,экскурсии,booking"
   permissions: "outbound HTTPS only to https://mcp.botclaw.ru/travel; execute bundled scripts/travel_search.py"
 ---
@@ -21,18 +21,22 @@ python scripts/travel_search.py describe <command>
 python scripts/travel_search.py list-tools
 ```
 
-Commands: `search-tours`, `search-hotels`, `get-tour-details`, `search-flights`, `flight-calendar`, `search-trains`, `search-activities`, `list-destinations`.
+Commands: `search-tours`, `cheapest-tours`, `search-hotels`, `get-tour-details`, `search-flights`, `flight-calendar`, `search-trains`, `search-activities`, `list-destinations`.
 
 Current tool schemas change over time. **Always** run `describe <command>` before a new parameter shape; do not invent fields from memory. See [references/usage.md](references/usage.md).
 
 ## Examples
 
 ```bash
-python scripts/travel_search.py search-tours --input '{"departure_city":"Москва","country":"Турция","date_from":"2026-09-10","date_to":"2026-09-20","adults":2}'
-python scripts/travel_search.py search-flights --input '{"origin":"MOW","destination":"AYT","depart_date":"2026-09-15","adults":1}'
-python scripts/travel_search.py search-trains --input '{"origin":"Москва","destination":"Сочи","depart_date":"2026-09-15","sort":"price","limit":5}'
-python scripts/travel_search.py search-activities --input '{"city":"Анталья","date_from":"2026-09-10","date_to":"2026-09-12","persons":2,"children_allowed":true,"sort":"recommended","limit":5}'
+python scripts/travel_search.py search-tours --input '{"departure_city":"Москва","country":"Турция","date_from":"YYYY-MM-DD","date_to":"YYYY-MM-DD","nights_min":7,"nights_max":10,"adults":2,"meal":"AI"}'
+python scripts/travel_search.py search-flights --input '{"origin":"MOW","destination":"AYT","depart_date":"YYYY-MM-DD","adults":1}'
+python scripts/travel_search.py search-trains --input '{"origin":"Москва","destination":"Сочи","depart_date":"YYYY-MM-DD","sort":"price","limit":5}'
+python scripts/travel_search.py search-activities --input '{"city":"Анталья","date_from":"YYYY-MM-DD","date_to":"YYYY-MM-DD","persons":2,"children_allowed":true,"sort":"recommended","limit":5}'
 ```
+
+## Даты
+
+`YYYY-MM-DD` в примерах — заполнитель. Сначала определите сегодняшнюю дату; если она неизвестна, выполните `date +%F`. Все даты передавайте в формате `YYYY-MM-DD` и не раньше сегодняшней, месяц для `flight-calendar` — в формате `YYYY-MM`. Если год не назван («15 сентября», «в мае»), имеется в виду ближайший такой день или месяц в будущем.
 
 ## Scope
 
@@ -58,6 +62,7 @@ If children are in the party and ages are unknown, **ask for ages** before prese
 | Need | Command |
 |------|---------|
 | Package tour (flight + hotel) | `search-tours` |
+| Quick cheapest tours, Travelata only | `cheapest-tours` |
 | Hotel only (no flight) | `search-hotels` |
 | Fresh price/availability before booking a tour | `get-tour-details` |
 | Flight options | `search-flights` |
@@ -69,6 +74,30 @@ If children are in the party and ages are unknown, **ask for ages** before prese
 ## Activities
 
 `search-activities` принимает необязательные `date_from` и `date_to` в формате `YYYY-MM-DD` (`date_from` ≤ `date_to`), `persons` от 1 до 100 и булево `children_allowed`. Сортировка: `recommended` (по умолчанию), `price`, `rating` или `reviews`. В каждой записи указан источник `provider`, единица цены `price_unit` (`per_person`, `per_group`, `per_ticket` или `unknown`) и понятный текст `price_text`. Сравнивайте цены только при одинаковом `price_unit`; сортировка `price` не смешивает разные единицы.
+
+## Туры и отели
+
+- `date_from`…`date_to` — окно дат вылета (для `search-hotels` — заезда) не длиннее 30 дней.
+- Всегда передавайте `nights_min` и `nights_max` явно (по умолчанию 7–10) и держите диапазон не шире 5 значений: Level.Travel ищет только `nights_min`…`nights_min`+4 (сервер сузит диапазон и добавит примечание), Travelata — весь диапазон. Для более широкого диапазона сделайте несколько поисков по очереди.
+- Питание `meal` (в `cheapest-tours` — список `meals`) передавайте кодом: `RO` — без питания, `BB` — завтраки, `HB` — полупансион, `FB` — полный пансион, `AI` — всё включено, `UAI` — ультра всё включено.
+- `search-hotels` тоже требует `departure_city`: передайте домашний город пользователя, а если он неизвестен — «Москва». Город влияет только на доступность предложений.
+- `cheapest-tours` — быстрый обзор самых дешёвых туров только из Travelata; для выбранного предложения вызовите `get-tour-details` с его `offer_id`.
+
+## Авиабилеты
+
+- `search-flights`: `return_date` (`YYYY-MM-DD`) необязателен. Поездку туда-обратно длиннее 30 дней сервер ищет как два перелёта в одну сторону: у элементов есть `leg` (`outbound` или `return`), итоговая цена — их сумма. Поиск в одну сторону возвращает самый дешёвый вариант на каждую дату — часто это один результат. Цены всегда для эконом-класса, даже если `trip_class` ≠ 0.
+- `flight-calendar`: `month` в формате `YYYY-MM`.
+
+## Ошибки
+
+При ошибке CLI завершается с кодом 1 и печатает `{"error":true,"category":…,"message":…}`; для `tool_error` в `message` — текст сервера.
+
+- Сообщение о неверных данных — исправьте ввод и не повторяйте запрос без изменений.
+- «Источник отклонил параметры запроса…» — измените параметры.
+- «Источник временно недоступен…» (ошибка всего вызова) — повторите один раз чуть позже, затем сообщите пользователю.
+- «Сервис поиска сейчас перегружен…», «Слишком много запросов…» или `rate_limited` — подождите около минуты.
+- Не запускайте второй `search-tours`, пока не завершился первый, и не повторяйте его с теми же аргументами. Если результатов мало, расширяйте поиск в рамках жёстких ограничений или с согласия пользователя.
+
 ## Workflow
 
 1. Clarify hard constraints (place, dates/nights, travelers, budget).
@@ -81,7 +110,6 @@ If children are in the party and ages are unknown, **ask for ages** before prese
 ## Rules
 
 - Russian catalog values/examples are intentional: the upstream directory uses Russian names. Preserve the user's answer language where possible; do not force Russian conversation. Use Russian catalog values for MCP calls when required.
-- **Hotel-only** requests use `search-hotels`, not package `search-tours`.
 - **Fresh details** for a chosen tour use `get-tour-details`; do not reuse stale offer payloads as live quotes.
 - Prefer **short booking URLs** from the response. If a short URL is missing, **never** fall back to a raw/long provider URL.
 - **Cached flight prices** (including calendar data) are not live quotes — say they may be outdated.

@@ -15,6 +15,7 @@ python scripts/travel_search.py <command> --input '<JSON object>'
 | CLI command | MCP tool |
 |-------------|----------|
 | `search-tours` | `search_tours` |
+| `cheapest-tours` | `get_cheapest_travelata_tours` |
 | `search-hotels` | `search_hotels` |
 | `get-tour-details` | `get_tour_details` |
 | `search-flights` | `search_flights` |
@@ -28,11 +29,17 @@ python scripts/travel_search.py <command> --input '<JSON object>'
 `--input` must be a single JSON **object**. Arrays, strings, numbers, `null`, and `true`/`false` are rejected.
 
 ```bash
-python scripts/travel_search.py search-tours --input '{"departure_city":"Москва","country":"Турция","date_from":"2026-09-10","date_to":"2026-09-20","adults":2}'
-python scripts/travel_search.py search-flights --input '{"origin":"MOW","destination":"AYT","depart_date":"2026-09-15","adults":1}'
-python scripts/travel_search.py search-trains --input '{"origin":"Москва","destination":"Сочи","depart_date":"2026-09-15","sort":"price","limit":5}'
-python scripts/travel_search.py search-activities --input '{"city":"Анталья","date_from":"2026-09-10","date_to":"2026-09-12","persons":2,"children_allowed":true,"sort":"recommended","limit":5}'
+python scripts/travel_search.py search-tours --input '{"departure_city":"Москва","country":"Турция","date_from":"YYYY-MM-DD","date_to":"YYYY-MM-DD","nights_min":7,"nights_max":10,"adults":2,"meal":"AI"}'
+python scripts/travel_search.py cheapest-tours --input '{"departure_city":"Москва","country":"Турция","date_from":"YYYY-MM-DD","date_to":"YYYY-MM-DD","nights_min":7,"nights_max":10,"resorts":["Кемер"],"meals":["AI","UAI"],"limit":5}'
+python scripts/travel_search.py search-flights --input '{"origin":"MOW","destination":"AYT","depart_date":"YYYY-MM-DD","adults":1}'
+python scripts/travel_search.py flight-calendar --input '{"origin":"MOW","destination":"AYT","month":"YYYY-MM"}'
+python scripts/travel_search.py search-trains --input '{"origin":"Москва","destination":"Сочи","depart_date":"YYYY-MM-DD","sort":"price","limit":5}'
+python scripts/travel_search.py search-activities --input '{"city":"Анталья","date_from":"YYYY-MM-DD","date_to":"YYYY-MM-DD","persons":2,"children_allowed":true,"sort":"recommended","limit":5}'
 ```
+
+### Dates
+
+`YYYY-MM-DD` / `YYYY-MM` above are placeholders. Determine today's date first (run `date +%F` if it is unknown). Every date is `YYYY-MM-DD` and must not be in the past; `flight-calendar` takes `month` as `YYYY-MM`. A day or month without a year means its next future occurrence. The server rejects past or malformed dates with a Russian validation message.
 
 ## Discover schemas
 
@@ -52,7 +59,24 @@ Response shape:
 }
 ```
 
-`list-tools` returns all eight CLI names with mapped MCP names and live descriptions.
+`list-tools` returns all nine CLI names with mapped MCP names and live descriptions.
+
+## Tours and hotels
+
+`search-tours`, `search-hotels`, and `cheapest-tours` share these rules:
+
+- `date_from`…`date_to` is the departure (hotel check-in) window: `date_to` ≥ `date_from`, at most 30 days.
+- Always pass `nights_min` and `nights_max` explicitly (`nights_min` ≤ `nights_max`; defaults are 7–10 for tours and hotels). Level.Travel searches at most 5 night values: a wider range is clamped to `nights_min`…`nights_min`+4 with a note, while Travelata searches the full range. For wider ranges run several searches one after another.
+- Meal codes: `RO` (без питания), `BB` (завтраки), `HB` (полупансион), `FB` (полный пансион), `AI` (всё включено), `UAI` (ультра всё включено). Pass codes, not names: `meal` for `search-tours` / `search-hotels`, a `meals` list for `cheapest-tours`.
+- `search-hotels` also requires `departure_city` even for hotel-only stays. Pass the user's home city, or `Москва` if unknown; it only affects availability.
+- `cheapest-tours` (`get_cheapest_travelata_tours`) is a quick Travelata-only overview of the cheapest tours: `departure_city`, `country`, `date_from`, `date_to`, optional `nights_min` / `nights_max`, `adults` (default 2), `kids_ages`, `resorts` (list), `meals` (list of codes), `stars_min`, `limit` (default 10). Refresh a chosen result with `get-tour-details` using its `offer_id`.
+
+## Flights
+
+- `search-flights` takes optional `return_date` (`YYYY-MM-DD`). A round trip longer than 30 days is answered as two one-way legs: items carry `"leg": "outbound"` or `"leg": "return"`, the total is their sum, and a note explains it.
+- One-way searches return the cheapest option per date, often a single item.
+- Prices are economy even when `trip_class` is not `0` (the server adds a note).
+- `flight-calendar` requires `month` in `YYYY-MM`.
 
 ## Trains
 
@@ -79,13 +103,28 @@ Every invocation prints exactly one JSON document to stdout (including `-h` / `-
 | 2 | Usage or input error |
 | 1 | MCP / transport failure |
 
-On failure, stdout is a small JSON object with `error`, `category`, and `message`. Stderr may contain only a short category token. Raw tool-error content is never echoed.
+On failure, stdout is a small JSON object with `error`, `category`, and `message`. Stderr may contain only a short category token.
+
+| Category | Meaning | What to do |
+|----------|---------|------------|
+| `tool_error` | The server rejected or could not run the call; `message` is its text | See below |
+| `rate_limited` | HTTP 429 from the service; `message` includes `retry after N s` when the server sent `Retry-After` | Wait about a minute (or `N` seconds) |
+| `timeout`, `network_error`, `http_error`, others | Transport or protocol failure | Retry once later, then tell the user |
+
+For `tool_error`, `message` is the first text item of the server's error with the `Error executing tool <name>: ` prefix and any URLs removed, capped at 300 characters. Typical texts:
+
+- Russian validation message (dates, nights, meal codes, …) — fix the input; do not repeat the same call.
+- «Источник отклонил параметры запроса…» — the provider rejected the parameters; change them.
+- «Источник временно недоступен. Повторите позже.» — provider outage; retry once later, then tell the user.
+- «Сервис поиска сейчас перегружен…» or «Слишком много запросов…» — rate limit; wait about a minute.
+
+Never start a second `search-tours` while one is running, and do not repeat it with identical arguments — widen dates or filters within the user's hard constraints instead.
 
 ## Result normalization
 
 For tool calls the CLI preserves normalized MCP data:
 
-1. If the tool result has `isError` exactly `true`, fail with a safe error (exit 1) — do not surface `content` / `structuredContent`.
+1. If the tool result has `isError` exactly `true`, fail with `tool_error` (exit 1); only the sanitized first text item is surfaced as `message`, never `structuredContent`.
 2. Prefer `structuredContent` when present.
 3. Else, if the first text content item is a JSON document, decode and return it.
 4. Else return the MCP result/content object without inventing fields.
