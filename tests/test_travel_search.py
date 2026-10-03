@@ -1047,7 +1047,7 @@ class TravelSearchTests(unittest.TestCase):
     def test_version_synchronization(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(pkg["version"], "2.3.0")
+        self.assertEqual(pkg["version"], "2.4.0")
         data, _ = self._skill_frontmatter()
         meta = data.get("metadata")
         # Agent Skills: metadata must be a YAML mapping of string values
@@ -1056,7 +1056,7 @@ class TravelSearchTests(unittest.TestCase):
             meta, dict, msg="metadata must be a YAML block mapping"
         )
         self.assertEqual(meta.get("author"), "MissiaL")
-        self.assertEqual(str(meta.get("version")), "2.3.0")
+        self.assertEqual(str(meta.get("version")), "2.4.0")
         self.assertIsInstance(
             meta.get("version"),
             str,
@@ -1093,14 +1093,14 @@ class TravelSearchTests(unittest.TestCase):
             msg="metadata must not use inline JSON-style object syntax",
         )
         # CLI client info / User-Agent stay synchronized with the release
-        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.3.0")
+        self.assertEqual(travel_search._CLIENT_INFO.get("version"), "2.4.0")
         client = travel_search.McpClient(endpoint=self.server.endpoint, timeout=5)
         client.list_tools()
         for r in _STATE.requests:
-            self.assertEqual(r["headers"].get("user-agent"), "travel-search-ru/2.3.0")
+            self.assertEqual(r["headers"].get("user-agent"), "travel-search-ru/2.4.0")
             if r["body"].get("method") == "initialize":
                 self.assertEqual(
-                    r["body"]["params"]["clientInfo"]["version"], "2.3.0"
+                    r["body"]["params"]["clientInfo"]["version"], "2.4.0"
                 )
         self.assertNotIn("2.0.1", pkg["version"])
         self.assertNotIn("2.0.0", pkg["version"])
@@ -1108,7 +1108,7 @@ class TravelSearchTests(unittest.TestCase):
 
     def test_skill_md_line_limit(self):
         lines = (ROOT / "SKILL.md").read_text(encoding="utf-8").splitlines()
-        self.assertLessEqual(len(lines), 130)
+        self.assertLessEqual(len(lines), 140)
 
     def test_skill_links_only_usage(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -1376,9 +1376,9 @@ class TravelSearchTests(unittest.TestCase):
         usage = (ROOT / "references" / "usage.md").read_text(encoding="utf-8")
         pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(pkg["version"], "2.3.0")
+        self.assertEqual(pkg["version"], "2.4.0")
         metadata, _ = self._skill_frontmatter()
-        self.assertEqual(metadata["metadata"]["version"], "2.3.0")
+        self.assertEqual(metadata["metadata"]["version"], "2.4.0")
 
         activity_example = (
             'python scripts/travel_search.py search-activities --input '

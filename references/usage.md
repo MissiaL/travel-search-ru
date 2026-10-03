@@ -65,10 +65,18 @@ Response shape:
 
 `search-tours`, `search-hotels`, and `cheapest-tours` share these rules:
 
-- `date_from`…`date_to` is the departure (hotel check-in) window: `date_to` ≥ `date_from`, at most 30 days.
+- `date_from`…`date_to` is the departure (hotel check-in) window: `date_to` ≥ `date_from`, at most 30 days. A fixed stay is a one-day window: `date_from` = `date_to` = check-in, `nights_min` = `nights_max` = nights.
+- `price_max` and every returned `price` are totals for the whole party and the whole stay.
+- One offer per hotel (the cheapest), both providers merged; `more_offers` counts other dates/options for that hotel. `rating` is on a 0–10 scale.
+- `meal` and `resort` take one value and `meal` matches exactly: for «завтраки или всё включено» or «Кемер или Белек» run one search per value. A resort includes its districts.
+- `resort` must be a name from `list-destinations` for that country; districts inside a region are listed as «Регион: Район». If a provider does not know the resort, it is skipped (see `notes`) rather than searched country-wide.
 - Always pass `nights_min` and `nights_max` explicitly (`nights_min` ≤ `nights_max`; defaults are 7–10 for tours and hotels). Level.Travel searches at most 5 night values: a wider range is clamped to `nights_min`…`nights_min`+4 with a note, while Travelata searches the full range. For wider ranges run several searches one after another.
 - Meal codes: `RO` (без питания), `BB` (завтраки), `HB` (полупансион), `FB` (полный пансион), `AI` (всё включено), `UAI` (ультра всё включено). Pass codes, not names: `meal` for `search-tours` / `search-hotels`, a `meals` list for `cheapest-tours`.
 - `search-hotels` also requires `departure_city` even for hotel-only stays. Pass the user's home city, or `Москва` if unknown; it only affects availability.
+- `beach_distance_max` (metres) and `beach_line_max` (1 = first line) keep only offers whose provider reports a value within the limit (unknown values are hidden); offers carry `beach_distance_m` and `beach_line` (`null` = unknown).
+- An empty result's note names the filters that removed the options and the cheapest blocked price — use it instead of a diagnostic re-search.
+- `get-tour-details` works for tour and hotel-only `offer_id`s. It returns the confirmed `price` (may differ from the search — re-check the budget), `transfer` (`group`, `individual`, or `none` = not included) and `flight_type` (`charter` / `regular`).
+- `hotels` (`search-tours` / `search-hotels`, up to 10 names in Latin script as the property spells it) compares specific properties: offers are limited to them and the result adds `named_hotels` — one entry per name with the matched `hotel`, `status` `matches`, `filtered_out` (with `reason`, e.g. over budget or fewer stars, plus `min_price`, `meal`, `check_in`, `nights`) or `not_found` (no offer for these dates, meal and party in this resort), and `other_matches` when a brand covers several hotels. Verify the matched `hotel` is the one meant. Search each resort separately.
 - `cheapest-tours` (`get_cheapest_travelata_tours`) is a quick Travelata-only overview of the cheapest tours: `departure_city`, `country`, `date_from`, `date_to`, optional `nights_min` / `nights_max`, `adults` (default 2), `kids_ages`, `resorts` (list), `meals` (list of codes), `stars_min`, `limit` (default 10). Refresh a chosen result with `get-tour-details` using its `offer_id`.
 
 ## Flights
@@ -76,7 +84,9 @@ Response shape:
 - `search-flights` takes optional `return_date` (`YYYY-MM-DD`). A round trip longer than 30 days is answered as two one-way legs: items carry `"leg": "outbound"` or `"leg": "return"`, the total is their sum, and a note explains it.
 - One-way searches return the cheapest option per date, often a single item.
 - Prices are economy even when `trip_class` is not `0` (the server adds a note).
-- `flight-calendar` requires `month` in `YYYY-MM`.
+- `price_per_adult` is per adult; `price_total_adults` multiplies it by `adults`. Child and infant fares are not provided — say so instead of guessing a family total.
+- Per leg: `transfers` and `duration_to_minutes` are outbound, `return_transfers` and `duration_back_minutes` are the way back; `duration_minutes` is both legs together.
+- `flight-calendar` requires `month` in `YYYY-MM`; its prices are one-way per date (a round trip costs more).
 
 ## Trains
 
@@ -89,9 +99,9 @@ are available, and the final price on Tutu.ru.
 
 ## Activities
 
-`search-activities` принимает необязательные `date_from` и `date_to` в формате `YYYY-MM-DD` (`date_from` ≤ `date_to`), `persons` от 1 до 100 и булево `children_allowed`. Для `sort`: `recommended` (по умолчанию), `price`, `rating` или `reviews`.
+`search-activities` ищет по теме через `query` (совпадение по основам слов в названии: «сафари», «острова», «Бурдж-Халифа») и принимает необязательные `date_from` и `date_to` в формате `YYYY-MM-DD` (`date_from` ≤ `date_to`), `persons` от 1 до 100 и булево `children_allowed`. Для `sort`: `recommended` (по умолчанию), `price`, `rating` или `reviews`.
 
-Каждый смешанный результат содержит `provider`, `price_unit` и `price_text`. Сравнивайте цены только при одинаковом `price_unit`; сортировка по цене не смешивает цену за человека, группу, билет и неизвестную единицу. Если один источник недоступен, покажите оставшиеся результаты без сообщения о сбое.
+Каждый смешанный результат содержит `provider`, `price_unit` и `price_text`; `sources` показывает, сколько нашёл каждый источник и почему один мог не участвовать (`skipped`, `unavailable`, `city not found`). Даты и `children_allowed` поддерживает только Tripster — с ними Sputnik8 не участвует; для широкого обзора ищите без дат. Индивидуальные экскурсии Tripster — `per_group` (цена за всю группу до `max_persons`). Сравнивайте цены только при одинаковом `price_unit`; сортировка по цене не смешивает цену за человека, группу, билет и неизвестную единицу. Если один источник недоступен, покажите оставшиеся результаты без сообщения о сбое.
 
 ## Output and exit codes
 
@@ -137,6 +147,8 @@ Useful partial multi-provider payloads without `isError: true` remain success (e
 - Do **not** auto-show above-budget offers. Alternatives outside a hard constraint only after **explicit user consent**, in a **separate labeled section**.
 - Unknown child ages → clarify before bookable family prices.
 - Hotel-only → `search-hotels`.
+- Named properties → `hotels`; report every `named_hotels` entry, including why one does not fit.
+- Nothing fits → name the constraint that removed the options and ask before relaxing it.
 - Refresh a chosen tour → `get-tour-details`.
 - Missing short booking URL → do not substitute a raw URL.
 - Flight prices from search/calendar may be cached — not live tickets.
