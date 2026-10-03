@@ -31,7 +31,7 @@ COMMAND_TO_TOOL = {
     "list-destinations": "list_destinations",
 }
 
-_VERSION = "2.4.0"
+_VERSION = "2.5.0"
 # Newest first; the first entry is requested in initialize.
 _SUPPORTED_PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
 _PROTOCOL_VERSION = _SUPPORTED_PROTOCOL_VERSIONS[0]

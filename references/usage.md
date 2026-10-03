@@ -65,9 +65,13 @@ Response shape:
 
 `search-tours`, `search-hotels`, and `cheapest-tours` share these rules:
 
-- `date_from`…`date_to` is the departure (hotel check-in) window: `date_to` ≥ `date_from`, at most 30 days. A fixed stay is a one-day window: `date_from` = `date_to` = check-in, `nights_min` = `nights_max` = nights.
+- `date_from`…`date_to` is the departure (hotel check-in) window: `date_to` ≥ `date_from`, at most 31 days (a calendar month). A fixed stay is a one-day window: `date_from` = `date_to` = check-in, `nights_min` = `nights_max` = nights.
 - `price_max` and every returned `price` are totals for the whole party and the whole stay.
-- One offer per hotel (the cheapest), both providers merged; `more_offers` counts other dates/options for that hotel. `rating` is on a 0–10 scale.
+- One offer per hotel (the cheapest), both providers merged; `more_offers` counts other dates/options for that hotel; `total_found` counts hotels. `rating` is on a 0–10 scale; `stars: null` = unknown. `limit` defaults to 10 (max 30).
+- Children: `kids_ages` (one age per child, 0–17) on `search-tours`, `search-hotels` and `cheapest-tours`.
+- Filters on our side (unknown values are hidden): `stars_max`, `beach_distance_max`, `beach_line_max`, `center_distance_max` (city hotels: `center_distance_m` in offers).
+- Resorts only Level.Travel knows (`resorts_level_travel_only` in `list-destinations`) are searched there only; a note says Travelata did not take part.
+- Dates more than ~5 months ahead: an empty result often means tours are not on sale yet (the note says so).
 - `meal` and `resort` take one value and `meal` matches exactly: for «завтраки или всё включено» or «Кемер или Белек» run one search per value. A resort includes its districts.
 - `resort` must be a name from `list-destinations` for that country; districts inside a region are listed as «Регион: Район». If a provider does not know the resort, it is skipped (see `notes`) rather than searched country-wide.
 - Always pass `nights_min` and `nights_max` explicitly (`nights_min` ≤ `nights_max`; defaults are 7–10 for tours and hotels). Level.Travel searches at most 5 night values: a wider range is clamped to `nights_min`…`nights_min`+4 with a note, while Travelata searches the full range. For wider ranges run several searches one after another.
@@ -87,6 +91,7 @@ Response shape:
 - `price_per_adult` is per adult; `price_total_adults` multiplies it by `adults`. Child and infant fares are not provided — say so instead of guessing a family total.
 - Per leg: `transfers` and `duration_to_minutes` are outbound, `return_transfers` and `duration_back_minutes` are the way back; `duration_minutes` is both legs together.
 - `flight-calendar` requires `month` in `YYYY-MM`; its prices are one-way per date (a round trip costs more).
+- Round trips also check both one-way legs: when two one-way tickets are cheaper, the result adds `one_way_combo` (`outbound`, `return`, `price_per_adult`, `price_total_adults`). An empty result means nothing is cached for those dates, not that there are no flights. `departure_at` is local time.
 
 ## Trains
 
