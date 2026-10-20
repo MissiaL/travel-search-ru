@@ -85,6 +85,7 @@ If children are in the party and ages are unknown, **ask for ages** before prese
 - В предложениях есть `beach_distance_m` и `beach_line` — данные источника; `null` значит «неизвестно», а не «близко». Рейтинг — по шкале 0–10.
 - Выдача — по одному варианту на отель (самый дешёвый); `more_offers` — сколько ещё дат и вариантов у отеля.
 - `cheapest-tours` — быстрый обзор самых дешёвых туров только из Travelata; для выбранного предложения вызовите `get-tour-details` с его `offer_id`.
+- `tripcom_url` в ответе `search-hotels` (и `search-tours`, когда вариантов мало) — выдача отелей Trip.com на те же даты и состав, без перелёта. Покажите её отдельной строкой «Ещё отели на Trip.com» после вариантов; если вариантов мало или нет — предложите её явно. Передавайте ссылку без изменений.
 
 ## Авиабилеты
 
@@ -125,7 +126,7 @@ If children are in the party and ages are unknown, **ask for ages** before prese
 
 - Russian catalog values/examples are intentional: the upstream directory uses Russian names. Preserve the user's answer language where possible; do not force Russian conversation. Use Russian catalog values for MCP calls when required.
 - **Fresh details** for a chosen tour use `get-tour-details`; do not reuse stale offer payloads as live quotes.
-- Prefer **short booking URLs** from the response. If a short URL is missing, **never** fall back to a raw/long provider URL.
+- Prefer **short booking URLs** from the response. If a short URL is missing, **never** fall back to a raw/long provider URL. Exception: `tripcom_url` is meant to be shown as returned.
 - **Cached flight prices** (including calendar data) are not live quotes — say they may be outdated.
 - **Tutu.ru train data is not real-time.** The requested date only shapes the result link. Verify the train, seats, and final price on Tutu.ru; never present `min_price_rub` as confirmed availability.
 - Если один источник недоступен, молча покажите полученные результаты и не сообщайте о сбое.
