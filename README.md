@@ -5,7 +5,7 @@
 [![agentskills.io](https://img.shields.io/badge/agentskills.io-compatible-purple.svg)](https://agentskills.io)
 [![ClawHub](https://img.shields.io/badge/ClawHub-travel--search--ru-blue.svg)](https://clawhub.ai/skills/travel-search-ru)
 
-Поисковый слой для планирования путешествий с популярными туристическими сервисами: **Aviasales**, **Travelata**, **Level.Travel**, **Tutu.ru**, **Tripster** и **Sputnik8**.
+Поисковый слой для планирования путешествий с популярными туристическими сервисами: **Aviasales**, **Travelata**, **Level.Travel**, **Tutu.ru**, **Tripster** и **Sputnik8**, а также ссылки на отели **Trip.com**.
 
 Агент может составить маршрут своими обычными инструментами, а навык найдёт для него авиабилеты, поезда, пакетные туры, отели и экскурсии. В ответе будут цены, ключевые параметры и короткие ссылки на выдачу. Навык работает в Claude Code, Cursor, Gemini CLI, GitHub Copilot и других AI-агентах.
 
@@ -17,6 +17,7 @@
 | **Tutu.ru** | Кэшированное расписание поездов и ориентировочные цены |
 | **Tripster** | Экскурсии и активности |
 | **Sputnik8** | Экскурсии, билеты и активности |
+| **Trip.com** | Ссылка на выдачу отелей на те же даты и состав (к поиску отелей и когда туров мало) |
 
 **Два способа подключения:** [Agent Skill](#установка) или [удалённый MCP-сервер](#mcp-сервер).
 
